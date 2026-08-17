@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 AHRAM OPTION ENGINE — بلک‌شولز + IV + Greeks + theta-aware
-نسخه اصلاح‌شده: نیوتن-رافسون با fallback امن
+نسخه نهایی: نیوتن-رافسون + بایسکشن fallback
 """
 import math
 import sqlite3
@@ -114,7 +114,7 @@ class OptionEngine:
                 "theta": theta, "vega": vega, "d1": d1, "d2": d2}
 
     def _implied_vol(self, market_price, S, K, T, r, option_type="CALL"):
-        """استخراج IV با نیوتن-رافسون + fallback امن."""
+        """استخراج IV: نیوتن-رافسون (سریع) + fallback بایسکشن (تضمین converge)."""
         if market_price <= 0 or T <= 0 or S <= 0 or K <= 0:
             return None
         intrinsic = max(0, S - K) if option_type == "CALL" else max(0, K - S)
@@ -124,6 +124,7 @@ class OptionEngine:
         sigma = 0.6
         best_sigma = sigma
         best_diff = abs(market_price)
+        oscillating = False
 
         for i in range(100):
             g = self._bs(S, K, T, r, sigma, option_type)
@@ -149,11 +150,28 @@ class OptionEngine:
                 sigma = 5.0
 
             if i > 20 and abs(diff) > best_diff * 2:
+                oscillating = True
                 break
 
-        if best_diff < market_price * 0.1:
-            return best_sigma
+        # بایسکشن fallback (تضمین converge)
+        lo, hi = 0.02, 5.0
+        f_lo = self._bs(S, K, T, r, lo, option_type)["fair_value"] - market_price
+        f_hi = self._bs(S, K, T, r, hi, option_type)["fair_value"] - market_price
+        if f_lo <= 0 <= f_hi:
+            for _ in range(60):
+                mid = (lo + hi) / 2.0
+                f_mid = self._bs(S, K, T, r, mid, option_type)["fair_value"] - market_price
+                if abs(f_mid) < 0.5:
+                    return mid
+                if f_mid > 0:
+                    hi = mid
+                else:
+                    lo = mid
+            return (lo + hi) / 2.0
 
+        # اگه نیوتن به جواب نزدیک و پایدار رسیده بود
+        if not oscillating and best_diff < market_price * 0.1:
+            return best_sigma
         return None
 
     def black_scholes(self, stock_price, strike_price, days_to_expire,
