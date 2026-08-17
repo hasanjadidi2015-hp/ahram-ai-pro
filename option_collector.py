@@ -1,242 +1,229 @@
 # -*- coding: utf-8 -*-
 """
-AHRAM OPTION COLLECTOR
-دریافت دیتای زنده‌ی اپشن‌ها از MarketWatchInit + ذخیره.
+جمع‌آوری داده‌ی آپشن از MarketWatchInit
+نسخه اصلاح‌شده: فیلتر بر اساس OPTION_ROOT
 """
 import sys
-import time
 import sqlite3
-from datetime import datetime
-
 import requests
-
-try:
-    import jdatetime
-    _HAS_JDATETIME = True
-except ImportError:
-    _HAS_JDATETIME = False
-
-import config
-
-_MW_CACHE = {"text": None, "ts": 0}
-_MW_TTL = 90
+from datetime import datetime
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
     pass
 
+import config
 
-class OptionCollector:
-    def __init__(self):
-        self.conn = sqlite3.connect(config.DATABASE_NAME)
-        self.cursor = self.conn.cursor()
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://www.tsetmc.com/",
+}
 
-    def save_option(self, symbol, option_type, stock_price, option_price,
-                    strike_price, expire_date, days_to_expire, volume,
-                    value_traded=0, open_interest=0):
-        self.cursor.execute(
-            """
-            INSERT INTO options
-            (time, symbol, option_type, stock_price, option_price,
-             strike_price, expire_date, days_to_expire, volume,
-             value_traded, open_interest)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
-            """,
-            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), symbol, option_type,
-             stock_price, option_price, strike_price, expire_date,
-             days_to_expire, volume, value_traded, open_interest)
-        )
-        self.conn.commit()
-
-    def close(self):
-        if self.conn:
-            self.conn.close()
+# اطلاعات نماد پایه
+UNDERLYING_INFO = {
+    "price": None,
+    "yesterday": None,
+    "volume": None,
+}
 
 
-def _to_float(value):
+def _parse_jalali_date(date_str):
+    """تبدیل تاریخ شمسی (مثل 1405/06/13) به تعداد روز تا سررسید"""
     try:
-        return float(value)
-    except (ValueError, TypeError):
-        return 0.0
-
-
-def _parse_strike_expire(name):
-    parts = name.split("-")
-    if len(parts) < 3:
-        return None, None
-    strike_str = parts[1].strip()
-    expire_str = parts[2].strip()
-    try:
-        strike = int(float(strike_str.replace(",", "")))
-    except ValueError:
-        return None, None
-    digits = expire_str.split("/")
-    if len(digits) == 3:
-        y, m, d = digits
-        try:
-            y = int(y)
-            if y < 100:
-                y = 1400 + y
-            expire_jalali = f"{y:04d}/{int(m):02d}/{int(d):02d}"
-        except ValueError:
-            return strike, expire_str
-    else:
-        return strike, expire_str
-    return strike, expire_jalali
-
-
-def _days_to_expire(expire_jalali):
-    if not _HAS_JDATETIME:
-        return 30
-    try:
-        y, m, d = expire_jalali.split("/")
-        exp_g = jdatetime.date(int(y), int(m), int(d)).togregorian()
-        today_g = jdatetime.date.today().togregorian()
-        return max(0, (exp_g - today_g).days)
+        import jdatetime
+        parts = date_str.strip().split("/")
+        if len(parts) != 3:
+            return None, None
+        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+        expire_jalali = jdatetime.date(year, month, day)
+        today_jalali = jdatetime.date.today()
+        delta = expire_jalali - today_jalali
+        days = delta.days
+        if days < 0:
+            return None, None
+        expire_greg = expire_jalali.togregorian().strftime("%Y-%m-%d")
+        return days, expire_greg
     except Exception:
-        return 30
-
-
-def _select_best_option(options, stock_price):
-    candidates = []
-    for o in options:
-        if config.OPTION_TYPE != "ALL" and o["option_type"] != config.OPTION_TYPE:
-            continue
-        if o["volume"] < config.OPTION_MIN_VOLUME:
-            continue
-        if o["days_to_expire"] < config.OPTION_MIN_DAYS:
-            continue
-        ratio = o["strike_price"] / stock_price if stock_price else 0
-        if ratio < config.STRIKE_RATIO_MIN or ratio > config.STRIKE_RATIO_MAX:
-            continue
-        candidates.append(o)
-    candidates.sort(key=lambda x: x["volume"], reverse=True)
-    print("-" * 60)
-    print("TOP CANDIDATES (ATM + liquid):")
-    for o in candidates[:3]:
-        ratio = o["strike_price"] / stock_price
-        print(f"  {o['option_type']} {o['symbol']:<16} STRIKE={o['strike_price']:<7} "
-              f"PRICE={o['option_price']:<9} VOL={int(o['volume']):<10} "
-              f"DAYS={o['days_to_expire']:<4} ratio={ratio:.2f}")
-    print("-" * 60)
-    if not candidates:
-        return None
-    best = candidates[0]
-    print("SELECTED:", best["symbol"], "| STRIKE", best["strike_price"],
-          "| PRICE", best["option_price"], "| DAYS", best["days_to_expire"])
-    return best
-
-
-UNDERLYING_INFO = {}
+        return None, None
 
 
 def collect_options():
+    """جمع‌آوری قراردادهای آپشن از MarketWatchInit"""
     global UNDERLYING_INFO
-    now = time.time()
-    if _MW_CACHE["text"] and (now - _MW_CACHE["ts"]) < _MW_TTL:
-        text = _MW_CACHE["text"]
-    else:
-        try:
-            r = requests.get(config.MARKET_WATCH_URL, timeout=25)
-        except Exception as e:
-            print("CONNECTION ERROR:", e)
-            return False
-        if r.status_code != 200:
-            print("SERVER ERROR:", r.status_code)
-            return False
-        text = r.text.strip()
-        _MW_CACHE["text"] = text
-        _MW_CACHE["ts"] = now
+
+    try:
+        r = requests.get(config.MARKET_WATCH_URL, headers=HEADERS, timeout=25)
+        r.raise_for_status()
+    except Exception as e:
+        print(f"[OPTION COLLECTOR] خطا دریافت: {e}")
+        return
+
+    text = r.text.strip()
     parts = text.split("@")
     if len(parts) < 3:
-        print("UNEXPECTED FORMAT")
-        return False
+        print("[OPTION COLLECTOR] فرمت غیرمنتظره")
+        return
+
     instruments = parts[2].strip().split(";")
 
-    ahrm_price = None
-    ahrm_close = None
-    ahrm_vol = None
+    # پیدا کردن نماد پایه
+    underlying_name = config.UNDERLYING
     for item in instruments:
         f = item.split(",")
         if len(f) < 23:
             continue
-        if f[2].strip() == config.UNDERLYING:
-            last = _to_float(f[7])
-            close = _to_float(f[6])
-            vol = _to_float(f[9])
-            ahrm_price = last if last > 0 else close
-            ahrm_close = close
-            ahrm_vol = vol
+        if f[2].strip() == underlying_name:
+            try:
+                price = float(f[1]) if f[1] else None
+                vol = float(f[5]) if f[5] else None
+                yesterday = float(f[7]) if f[7] else None
+                UNDERLYING_INFO["price"] = price
+                UNDERLYING_INFO["volume"] = vol
+                UNDERLYING_INFO["yesterday"] = yesterday
+            except (ValueError, IndexError):
+                pass
+            break
 
-    if ahrm_price is None:
-        print(config.UNDERLYING, "PRICE NOT FOUND")
-        UNDERLYING_INFO = {}
-        return False
+    # جمع‌آوری آپشن‌ها
+    option_root = getattr(config, "OPTION_ROOT", None)
+    options_list = []
 
-    UNDERLYING_INFO = {"price": ahrm_price, "yesterday": ahrm_close, "volume": ahrm_vol}
-
-    options = []
     for item in instruments:
         f = item.split(",")
         if len(f) < 23:
             continue
-        name = f[3].strip()
+
+        # نوع ابزار: 311=اختیار خرید، 312=اختیار فروش
         ins_type = f[22].strip()
         if ins_type not in ("311", "312"):
             continue
-        if config.UNDERLYING not in name:
+
+        name = f[2].strip()
+
+        # فیلتر بر اساس ریشه آپشن
+        if option_root:
+            if option_root not in name:
+                continue
+        else:
+            if config.UNDERLYING not in name:
+                continue
+
+        try:
+            symbol = f[0].strip() if len(f) > 0 else name
+            stock_price = float(f[1]) if f[1] else 0
+            last_trade = float(f[6]) if f[6] else 0
+            close_price = float(f[7]) if f[7] else 0
+            volume = float(f[9]) if f[9] else 0
+            value = float(f[10]) if f[10] else 0
+            open_interest = float(f[12]) if f[12] else 0
+
+            # قیمت آپشن
+            option_price = last_trade if last_trade > 0 else close_price
+            if option_price <= 0:
+                continue
+
+            # قیمت اعمال
+            strike_price = 0
+            for i in range(13, min(20, len(f))):
+                try:
+                    val = float(f[i])
+                    if val > 0 and val != option_price and val != stock_price:
+                        strike_price = val
+                        break
+                except ValueError:
+                    continue
+
+            if strike_price <= 0:
+                continue
+
+            # تاریخ سررسید
+            expire_date = f[21].strip() if len(f) > 21 else ""
+            days_to_expire, expire_greg = _parse_jalali_date(expire_date)
+
+            if days_to_expire is None or days_to_expire < config.OPTION_MIN_DAYS:
+                continue
+
+            option_type = "CALL" if ins_type == "311" else "PUT"
+
+            options_list.append({
+                "symbol": name,
+                "option_type": option_type,
+                "stock_price": stock_price,
+                "option_price": option_price,
+                "strike_price": strike_price,
+                "expire_date": expire_date,
+                "expire_greg": expire_greg,
+                "days_to_expire": days_to_expire,
+                "volume": volume,
+                "value": value,
+                "open_interest": open_interest,
+            })
+
+        except (ValueError, IndexError):
             continue
-        strike, expire = _parse_strike_expire(name)
-        if strike is None:
-            continue
-        last = _to_float(f[7])
-        close = _to_float(f[6])
-        price = last if last > 0 else close
-        if price <= 0:
-            continue
-        volume = _to_float(f[9])
-        value = _to_float(f[10])
-        otype = "CALL" if ins_type == "311" else "PUT"
-        days = _days_to_expire(expire)
-        options.append({
-            "symbol": f[2].strip(), "option_type": otype, "stock_price": ahrm_price,
-            "option_price": price, "strike_price": strike, "expire_date": expire,
-            "days_to_expire": days, "volume": volume, "value_traded": value,
-        })
 
-    print("=" * 60)
-    print("OPTION DATA FETCHED FROM TSETMC (MarketWatchInit)")
-    print(config.UNDERLYING, "PRICE :", int(ahrm_price))
-    print("TOTAL OPTIONS :", len(options))
-    print("=" * 60)
+    if not options_list:
+        print("[OPTION COLLECTOR] هیچ آپشنی پیدا نشد")
+        return
 
-    if not _HAS_JDATETIME:
-        print("WARNING: jdatetime نصب نیست.  pip install jdatetime")
+    # ذخیره در دیتابیس
+    try:
+        conn = sqlite3.connect(config.DATABASE_NAME)
+        cur = conn.cursor()
 
-    _select_best_option(options, ahrm_price)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    conn = sqlite3.connect(config.DATABASE_NAME)
-    cur = conn.cursor()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    saved = 0
-    for o in options:
-        cur.execute(
-            """
-            INSERT INTO options
-            (time, symbol, option_type, stock_price, option_price, strike_price,
-             expire_date, days_to_expire, volume, value_traded, open_interest)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
-            """,
-            (now_str, o["symbol"], o["option_type"], o["stock_price"], o["option_price"],
-             o["strike_price"], o["expire_date"], o["days_to_expire"],
-             o["volume"], o["value_traded"], o["volume"])
-        )
-        saved += 1
-    conn.commit()
-    conn.close()
-    print(f"OPTION CHAIN SAVED: {saved} contracts (MarketWatchInit - سریع)")
-    return True
+        for opt in options_list:
+            cur.execute("""
+                INSERT INTO options (
+                    time, symbol, option_type, stock_price, option_price,
+                    strike_price, expire_date, days_to_expire,
+                    volume, value_traded, open_interest
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                now,
+                opt["symbol"],
+                opt["option_type"],
+                opt["stock_price"],
+                opt["option_price"],
+                opt["strike_price"],
+                opt["expire_date"],
+                opt["days_to_expire"],
+                opt["volume"],
+                opt["value"],
+                opt["open_interest"],
+            ))
+
+        conn.commit()
+        conn.close()
+
+        print("=" * 60)
+        print(f"OPTION DATA FETCHED FROM TSETMC (MarketWatchInit)")
+        print(f"{config.UNDERLYING} PRICE : {UNDERLYING_INFO.get('price')}")
+        print(f"TOTAL OPTIONS : {len(options_list)}")
+        print("=" * 60)
+
+        # نمایش بهترین کاندیدها
+        sorted_opts = sorted(options_list, key=lambda x: x["volume"], reverse=True)
+        print("TOP CANDIDATES (ATM + liquid):")
+        stock_price = UNDERLYING_INFO.get("price") or 0
+        for opt in sorted_opts[:5]:
+            ratio = opt["strike_price"] / stock_price if stock_price > 0 else 0
+            print(f"  {opt['option_type']} {opt['symbol']:<20} "
+                  f"STRIKE={int(opt['strike_price'])}    "
+                  f"PRICE={opt['option_price']}     "
+                  f"VOL={int(opt['volume'])}    "
+                  f"DAYS={opt['days_to_expire']}   "
+                  f"ratio={ratio:.2f}")
+
+    except Exception as e:
+        print(f"[OPTION COLLECTOR] خطا ذخیره: {e}")
 
 
 if __name__ == "__main__":

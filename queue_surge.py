@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 تشخیص صف خرید/فروش سنگین - نسخه نهایی
+آستانه بر اساس دامنه نوسان واقعی هر نماد
 """
 import sqlite3
 from datetime import datetime, time as dtime
@@ -10,8 +11,16 @@ MARKET_OPEN = dtime(9, 0)
 MARKET_CLOSE = dtime(12, 30)
 TOTAL_MARKET_MINUTES = (12 * 60 + 30) - (9 * 60)
 
-CEILING_GAP_MIN = 1.5
 HEAVY_RATIO_MIN = 1.5
+
+
+def get_queue_gap(symbol_name=None):
+    """دریافت آستانه صف بر اساس نماد"""
+    if symbol_name:
+        for sym in config.SYMBOLS:
+            if sym["name"] == symbol_name:
+                return sym.get("queue_gap", 7.0)
+    return config.QUEUE_GAP_MIN
 
 
 def compute_avg_daily_volume(days=20):
@@ -42,7 +51,7 @@ def _minutes_since_open():
     return max(1, min(TOTAL_MARKET_MINUTES, m))
 
 
-def detect_heavy_queue(current_price, yesterday_close, today_volume, avg_daily_volume=None):
+def detect_heavy_queue(current_price, yesterday_close, today_volume, avg_daily_volume=None, symbol_name=None):
     result = {
         "queue_type": None,
         "gap_pct": 0.0,
@@ -59,14 +68,17 @@ def detect_heavy_queue(current_price, yesterday_close, today_volume, avg_daily_v
     gap = (current_price - yesterday_close) / yesterday_close * 100.0
     result["gap_pct"] = round(gap, 2)
 
-    if gap >= CEILING_GAP_MIN:
+    # آستانه بر اساس نماد
+    ceiling_gap = get_queue_gap(symbol_name)
+
+    if gap >= ceiling_gap:
         result["locked"] = True
         result["queue_type"] = "BUY"
-    elif gap <= -CEILING_GAP_MIN:
+    elif gap <= -ceiling_gap:
         result["locked"] = True
         result["queue_type"] = "SELL"
     else:
-        result["reason"] = f"gap {gap:.1f}% - not locked (min {CEILING_GAP_MIN}%)"
+        result["reason"] = f"gap {gap:.1f}% - not locked (min {ceiling_gap}%)"
         return result
 
     if avg_daily_volume and avg_daily_volume > 0 and today_volume and today_volume > 0:

@@ -18,6 +18,7 @@ MIN_CONFIDENCE = 40
 STOP_LOSS_PERCENT = 0.02
 TAKE_PROFIT_PERCENT = 0.04
 UNDERLYING = "اهرم"
+OPTION_ROOT = "هرم"
 MARKET_WATCH_URL = "https://old.tsetmc.com/tsev2/data/MarketWatchInit.aspx?h=0&r=0"
 OPTION_TYPE = "CALL"
 OPTION_MIN_VOLUME = 5000
@@ -36,12 +37,12 @@ MOMENTUM_LOOKBACK = 5
 MOMENTUM_THRESHOLD = 0.4
 MOMENTUM_BONUS = 12
 
-# ===== تنظیمات صف =====
+# ===== تنظیمات صف (اصلاح‌شده) =====
 QUEUE_GAP_MIN = 1.5
 
-# ===== نمادها =====
+# ===== نمادها (با ریشه آپشن) =====
 SYMBOLS = [
-    {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db"},
-    {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db"},
-    {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db"},
+    {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db", "option_root": "هرم", "queue_gap": 4.0},
+    {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db", "option_root": "ملت", "queue_gap": 7.0},
+    {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db", "option_root": "ستا", "queue_gap": 7.0},
 ]

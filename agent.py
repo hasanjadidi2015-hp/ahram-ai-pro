@@ -124,7 +124,10 @@ def _volume_confirmation():
         return 1.0, True, f"error: {e}"
 
 
-def _analyze_symbol(name):
+def _analyze_symbol(sym):
+    name = sym["name"]
+    db = sym.get("db", "ahram_v2.db")
+
     _safe(create_database, "DB")
     if _HAS_LEARNING:
         _safe(learning_core.daily_update, "LEARN")
@@ -152,7 +155,7 @@ def _analyze_symbol(name):
             vol_today = UNDERLYING_INFO.get("volume")
             if u_price and yday and yday > 0:
                 avg_vol = queue_surge.compute_avg_daily_volume(20)
-                qi = queue_surge.detect_heavy_queue(u_price, yday, vol_today, avg_vol)
+                qi = queue_surge.detect_heavy_queue(u_price, yday, vol_today, avg_vol, symbol_name=name)
                 print(f"[QUEUE] {qi['reason']}")
                 if queue_surge.should_trigger_call_surge(qi):
                     queue_surge_buy = True
@@ -308,9 +311,10 @@ def run_once():
         if ins:
             config.INS_CODE = ins
         config.DATABASE_NAME = db
+        config.OPTION_ROOT = sym.get("option_root", "")
         print(f"\n{'#' * 60}\n# {name}\n{'#' * 60}")
         try:
-            _analyze_symbol(name)
+            _analyze_symbol(sym)
         except Exception as e:
             print(f"[{name}] ERROR:", e)
     if _HAS_DASHBOARD:

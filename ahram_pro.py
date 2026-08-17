@@ -21,9 +21,9 @@ CONFIG = {
     "version": "3.0",
     "name": "AHRAM AI PRO",
     "symbols": [
-        {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db"},
-        {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db"},
-        {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db"},
+        {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db", "option_root": "هرم", "queue_gap": 4.0},
+        {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db", "option_root": "ملت", "queue_gap": 7.0},
+        {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db", "option_root": "ستا", "queue_gap": 7.0},
     ],
     "market_open": dtime(9, 0),
     "market_close": dtime(12, 30),
@@ -310,7 +310,7 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
             checks["tape_ok"] = True
             reasons.append(f"✅ TAPE: {tape_data.get('score')}/5")
         else:
-            reasons.append(f"⚠️ TAPE: {tape_data.get('score')}/5 (غیرتأیید)")
+            reasons.append(f"⚠️ TAPE: {tape_data.get('score')}/5")
 
     indices = market_data.get("indices")
     money_flow = market_data.get("money_flow")
@@ -500,6 +500,7 @@ def analyze_symbol(symbol_config):
     config.UNDERLYING = name
     config.DATABASE_NAME = db
     config.INS_CODE = symbol_config["ins_code"]
+    config.OPTION_ROOT = symbol_config.get("option_root", "")
 
     market_data = collect_market_data(symbol_config)
     technicals = analyze_technicals(symbol_config)
