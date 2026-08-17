@@ -1,0 +1,41 @@
+# ===== فایل‌های محرمانه =====
+*.db
+*.sqlite
+*.env
+.env
+.env.*
+
+# ===== فایل‌های لاگ =====
+*.log
+bot_log.txt
+ahram_log.txt
+response.txt
+result.tx
+
+# ===== فایل‌های سیستمی =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# ===== فایل‌های اضافی =====
+_archive/
+*.b64
+*.txt
+!requirements.txt
+dashboard.html
+
+# ===== پوشه‌های سیستمی =====
+.venv/
+venv/
+.env/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== فایل‌های حساس =====
+telegram_config.py

@@ -1,0 +1,588 @@
+# -*- coding: utf-8 -*-
+"""
+╔══════════════════════════════════════════════════════════════╗
+║              AHRAM AI PRO v3.0 - نسخه نهایی                 ║
+║         سیستم معامله‌گری تجمیعی آپشن بورس ایران              ║
+╚══════════════════════════════════════════════════════════════╝
+"""
+import sys
+import sqlite3
+import time
+import json
+from datetime import datetime, time as dtime
+from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except:
+    pass
+
+CONFIG = {
+    "version": "3.0",
+    "name": "AHRAM AI PRO",
+    "symbols": [
+        {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db"},
+        {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db"},
+        {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db"},
+    ],
+    "market_open": dtime(9, 0),
+    "market_close": dtime(12, 30),
+    "cycle_seconds": 300,
+    "min_score": 60,
+    "min_indicators": 4,
+    "min_volume_ratio": 1.0,
+    "max_wiv_for_buy": 85,
+    "max_positions": 3,
+    "risk_per_trade": 0.02,
+    "capital": 100_000_000,
+    "telegram_enabled": True,
+    "desktop_enabled": True,
+    "dashboard_enabled": True,
+}
+
+
+class SystemState:
+    def __init__(self):
+        self.start_time = datetime.now()
+        self.cycles = 0
+        self.signals_generated = 0
+        self.last_signal_time = None
+        self.errors = []
+
+    def log(self, message, level="INFO"):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}] [{level}] {message}")
+
+
+state = SystemState()
+_modules = {}
+
+
+def get_module(name):
+    if name not in _modules:
+        try:
+            if name == "collector":
+                from collector import collect
+                _modules[name] = collect
+            elif name == "strategy":
+                from strategy import Strategy
+                _modules[name] = Strategy
+            elif name == "option_selector":
+                from option_selector import OptionSelector
+                _modules[name] = OptionSelector
+            elif name == "signal_generator":
+                from signal_generator import generate_signal
+                _modules[name] = generate_signal
+            elif name == "option_engine":
+                from option_engine import OptionEngine, compute_historical_volatility
+                _modules[name] = {"engine": OptionEngine, "hv": compute_historical_volatility}
+            elif name == "queue_surge":
+                import queue_surge
+                _modules[name] = queue_surge
+            elif name == "fog_meter":
+                from fog_meter import measure
+                _modules[name] = measure
+            elif name == "tape_reader":
+                import tape_reader
+                _modules[name] = tape_reader
+            elif name == "wiv":
+                from wiv import WIVCalculator
+                _modules[name] = WIVCalculator
+            elif name == "index_feed":
+                from index_feed import fetch_and_save_indices
+                _modules[name] = fetch_and_save_indices
+            elif name == "money_flow":
+                from money_flow import fetch_and_save_money_flow
+                _modules[name] = fetch_and_save_money_flow
+            elif name == "dashboard":
+                import dashboard
+                _modules[name] = dashboard
+            elif name == "telegram":
+                from telegram_notify import send_telegram_message
+                _modules[name] = send_telegram_message
+            elif name == "desktop":
+                from desktop_notify import send_desktop_notification
+                _modules[name] = send_desktop_notification
+            elif name == "learning":
+                import learning_core
+                _modules[name] = learning_core
+            elif name == "database":
+                from database import create_database
+                _modules[name] = create_database
+            else:
+                _modules[name] = None
+        except Exception as e:
+            state.log(f"ماژول {name} بارگذاری نشد: {e}", "WARN")
+            _modules[name] = None
+    return _modules[name]
+
+
+def collect_market_data(symbol_config):
+    name = symbol_config["name"]
+    db = symbol_config["db"]
+    state.log(f"📊 شروع جمع‌آوری دیتا: {name}")
+    data = {"name": name, "db": db, "timestamp": datetime.now().isoformat(), "stock": {}, "options": {}, "market": {}, "indicators": {}}
+
+    try:
+        collector = get_module("collector")
+        if collector:
+            collector()
+            state.log(f"  ✅ قیمت سهم دریافت شد")
+    except Exception as e:
+        state.log(f"  ❌ خطا قیمت سهم: {e}", "ERROR")
+
+    try:
+        from option_collector import collect_options
+        collect_options()
+        state.log(f"  ✅ اطلاعات آپشن دریافت شد")
+    except Exception as e:
+        state.log(f"  ⚠️ خطا آپشن: {e}", "WARN")
+
+    try:
+        index_feed = get_module("index_feed")
+        if index_feed:
+            indices = index_feed()
+            data["market"]["indices"] = indices
+            state.log(f"  ✅ شاخص‌ها دریافت شد")
+    except Exception as e:
+        state.log(f"  ⚠️ خطا شاخص: {e}", "WARN")
+
+    try:
+        money_flow = get_module("money_flow")
+        if money_flow:
+            flow = money_flow()
+            data["market"]["money_flow"] = flow
+            state.log(f"  ✅ جریان پول دریافت شد")
+    except Exception as e:
+        state.log(f"  ⚠️ خطا جریان پول: {e}", "WARN")
+
+    try:
+        hv_func = get_module("option_engine")["hv"]
+        hv = hv_func()
+        data["stock"]["hv"] = hv
+        if hv:
+            state.log(f"  ✅ نوسان تاریخی: {round(hv*100,1)}%")
+    except Exception as e:
+        state.log(f"  ⚠️ خطا HV: {e}", "WARN")
+
+    return data
+
+
+def analyze_technicals(symbol_config):
+    name = symbol_config["name"]
+    state.log(f"📈 تحلیل تکنیکال: {name}")
+    result = {"action": "WATCH", "confidence": 0, "score": 0, "price": 0, "indicators": {}, "reasons": []}
+
+    try:
+        Strategy = get_module("strategy")
+        if Strategy:
+            strategy = Strategy()
+            analysis = strategy.analyze()
+            strategy.close()
+            if analysis:
+                action, confidence, score, price = analysis
+                result["action"] = action
+                result["confidence"] = confidence
+                result["score"] = score
+                result["price"] = price
+                state.log(f"  ✅ نتیجه: {action} | امتیاز: {score} | اطمینان: {confidence}%")
+            else:
+                state.log(f"  ⚠️ داده کافی نیست", "WARN")
+    except Exception as e:
+        state.log(f"  ❌ خطا تحلیل: {e}", "ERROR")
+
+    return result
+
+
+def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
+    name = symbol_config["name"]
+    state.log(f"🎯 تحلیل آپشن: {name}")
+    result = {"selected": None, "wiv": None, "fog": None, "tape": None}
+
+    try:
+        OptionSelector = get_module("option_selector")
+        if OptionSelector:
+            selector = OptionSelector()
+            option = selector.run(stock_action=stock_action, stock_confidence=stock_confidence, current_stock_price=stock_price)
+            selector.close()
+            if option:
+                result["selected"] = option
+                state.log(f"  ✅ آپشن انتخاب شد: {option.get('symbol')}")
+            else:
+                state.log(f"  ⚠️ آپشن مناسب پیدا نشد", "WARN")
+    except Exception as e:
+        state.log(f"  ❌ خطا انتخاب آپشن: {e}", "ERROR")
+
+    try:
+        WIVCalculator = get_module("wiv")
+        if WIVCalculator:
+            wiv_calc = WIVCalculator()
+            wiv_value = wiv_calc.calculate()
+            if wiv_value:
+                result["wiv"] = wiv_calc.details
+                state.log(f"  ✅ WIV: {wiv_calc.details.get('wiv_pct')}% ({wiv_calc.details.get('wiv_level')})")
+    except Exception as e:
+        state.log(f"  ⚠️ خطا WIV: {e}", "WARN")
+
+    try:
+        fog_measure = get_module("fog_meter")
+        if fog_measure:
+            price = stock_price or 0
+            db = symbol_config["db"]
+            level, ratio, advice = fog_measure(price, db)
+            result["fog"] = {"level": level, "ratio": ratio, "advice": advice}
+            state.log(f"  ✅ FOG: {level} ({ratio})")
+    except Exception as e:
+        state.log(f"  ⚠️ خطا FOG: {e}", "WARN")
+
+    try:
+        tape = get_module("tape_reader")
+        if tape:
+            passed, score, details = tape.evaluate()
+            result["tape"] = {"passed": passed, "score": score, "details": details}
+            if passed is not None:
+                state.log(f"  ✅ TAPE: {score}/5")
+    except Exception as e:
+        state.log(f"  ⚠️ خطا TAPE: {e}", "WARN")
+
+    return result
+
+
+def generate_multi_layer_signal(symbol_config, technicals, options_analysis, market_data):
+    name = symbol_config["name"]
+    state.log(f"🚦 تولید سیگنال: {name}")
+
+    checks = {
+        "technicals_ok": False,
+        "volume_ok": True,
+        "option_ok": False,
+        "wiv_ok": False,
+        "fog_ok": False,
+        "tape_ok": False,
+        "market_ok": False,
+    }
+
+    reasons = []
+    score = technicals.get("score", 0)
+
+    if technicals["action"] in ("BUY", "STRONG BUY"):
+        checks["technicals_ok"] = True
+        reasons.append("✅ تحلیل تکنیکال: صعودی")
+    elif technicals["action"] in ("SELL", "STRONG SELL"):
+        checks["technicals_ok"] = True
+        reasons.append("✅ تحلیل تکنیکال: نزولی")
+    else:
+        reasons.append("❌ تحلیل تکنیکال: خنثی")
+
+    if technicals.get("confidence", 0) >= 40:
+        checks["volume_ok"] = True
+        reasons.append("✅ حجم: تأیید")
+
+    option = options_analysis.get("selected")
+    if option:
+        checks["option_ok"] = True
+        reasons.append(f"✅ آپشن: {option.get('symbol')}")
+    else:
+        reasons.append("❌ آپشن: نامناسب")
+
+    wiv_data = options_analysis.get("wiv")
+    if wiv_data:
+        wiv_level = wiv_data.get("wiv_level", "UNKNOWN")
+        wiv_pct = wiv_data.get("wiv_pct", 100)
+        if wiv_pct <= CONFIG["max_wiv_for_buy"]:
+            checks["wiv_ok"] = True
+            reasons.append(f"✅ WIV: {wiv_pct}% ({wiv_level})")
+        else:
+            reasons.append(f"❌ WIV: {wiv_pct}% (گران)")
+
+    fog_data = options_analysis.get("fog")
+    if fog_data:
+        fog_level = fog_data.get("level", "UNKNOWN")
+        if fog_level in ("CLEAN", "LIGHT"):
+            checks["fog_ok"] = True
+            reasons.append(f"✅ FOG: {fog_level}")
+        else:
+            reasons.append(f"❌ FOG: {fog_level}")
+
+    tape_data = options_analysis.get("tape")
+    if tape_data:
+        if tape_data.get("passed"):
+            checks["tape_ok"] = True
+            reasons.append(f"✅ TAPE: {tape_data.get('score')}/5")
+        else:
+            reasons.append(f"⚠️ TAPE: {tape_data.get('score')}/5 (غیرتأیید)")
+
+    indices = market_data.get("indices")
+    money_flow = market_data.get("money_flow")
+    if indices or money_flow:
+        checks["market_ok"] = True
+        reasons.append("✅ فضای بازار: بررسی شد")
+
+    passed_checks = sum(1 for v in checks.values() if v)
+    total_checks = len(checks)
+    check_score = (passed_checks / total_checks) * 100
+    final_score = (score * 0.6) + (check_score * 0.4)
+
+    min_checks = 3
+
+    if passed_checks >= min_checks and final_score >= CONFIG["min_score"]:
+        if technicals["action"] in ("BUY", "STRONG BUY"):
+            signal_type = "BUY_CALL"
+        elif technicals["action"] in ("SELL", "STRONG SELL"):
+            signal_type = "BUY_PUT"
+        else:
+            signal_type = "WATCH"
+    else:
+        signal_type = "WATCH"
+
+    signal = {
+        "type": signal_type,
+        "score": round(final_score),
+        "checks_passed": passed_checks,
+        "checks_total": total_checks,
+        "reasons": reasons,
+        "option": option,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+    if signal_type in ("BUY_CALL", "BUY_PUT") and option:
+        targets = _calculate_targets(option, signal_type)
+        signal["targets"] = targets
+        signal["message"] = _format_signal_message(signal, name)
+    else:
+        signal["message"] = f"\n{name}: {signal_type} (امتیاز: {round(final_score)})\n"
+
+    state.log(f"  نتیجه: {signal_type} | امتیاز: {round(final_score)} | شرایط: {passed_checks}/{total_checks}")
+
+    return signal
+
+
+def _calculate_targets(option, signal_type):
+    entry = float(option.get("option_price", 0))
+    dte = int(option.get("days_to_expire", 30))
+    if entry <= 0:
+        return None
+    if dte <= 7:
+        sl_pct = 0.10
+    elif dte <= 21:
+        sl_pct = 0.12
+    else:
+        sl_pct = 0.15
+    t1_pct = 0.15
+    t2_pct = 0.30
+    return {
+        "entry": round(entry),
+        "stop_loss": round(entry * (1 - sl_pct)),
+        "stop_loss_pct": round(sl_pct * 100),
+        "target1": round(entry * (1 + t1_pct)),
+        "target1_pct": round(t1_pct * 100),
+        "target2": round(entry * (1 + t2_pct)),
+        "target2_pct": round(t2_pct * 100),
+    }
+
+
+def _format_signal_message(signal, symbol_name):
+    option = signal.get("option", {})
+    targets = signal.get("targets", {})
+    lines = []
+    lines.append("╔" + "═" * 46 + "╗")
+    if signal["type"] == "BUY_CALL":
+        lines.append("║" + "  🟢  سیگنال خرید کال  ".center(40) + "║")
+    else:
+        lines.append("║" + "  🔴  سیگنال خرید پوت  ".center(40) + "║")
+    lines.append("╚" + "═" * 46 + "╝")
+    lines.append("")
+    lines.append(f"📊 نماد: {symbol_name}")
+    lines.append(f"📈 امتیاز: {signal['score']}/100")
+    lines.append(f"✅ شرایط: {signal['checks_passed']}/{signal['checks_total']}")
+    lines.append("")
+    if option:
+        lines.append(f"🎯 قرارداد: {option.get('symbol')}")
+        lines.append(f"   نوع: {option.get('option_type')}")
+        lines.append(f"   قیمت اعمال: {option.get('strike_price'):,}")
+        lines.append(f"   سررسید: {option.get('expire_date')} ({option.get('days_to_expire')} روز)")
+        lines.append(f"   قیمت آپشن: {option.get('option_price'):,}")
+        lines.append(f"   دلتا: {option.get('delta')}")
+        lines.append("")
+    if targets:
+        lines.append(f"🛑 حد ضرر: {targets['stop_loss']:,} (-{targets['stop_loss_pct']}%)")
+        lines.append(f"🎯 هدف اول: {targets['target1']:,} (+{targets['target1_pct']}%)")
+        lines.append(f"🚀 هدف دوم: {targets['target2']:,} (+{targets['target2_pct']}%)")
+        lines.append("")
+    lines.append("📋 دلایل:")
+    for reason in signal.get("reasons", []):
+        lines.append(f"   {reason}")
+    lines.append("")
+    lines.append("━" * 46)
+    return "\n".join(lines)
+
+
+def send_notification(signal, symbol_name):
+    if signal["type"] == "WATCH":
+        return
+    message = signal.get("message", "")
+    title = f"AHRAM AI - {signal['type']} {symbol_name}"
+    if CONFIG["telegram_enabled"]:
+        try:
+            telegram = get_module("telegram")
+            if telegram:
+                telegram(f"{title}\n\n{message}")
+                state.log("  ✅ تلگرام ارسال شد")
+        except Exception as e:
+            state.log(f"  ❌ خطا تلگرام: {e}", "ERROR")
+    if CONFIG["desktop_enabled"]:
+        try:
+            desktop = get_module("desktop")
+            if desktop:
+                desktop(title, message[:200])
+                state.log("  ✅ دسکتاپ ارسال شد")
+        except Exception as e:
+            state.log(f"  ❌ خطا دسکتاپ: {e}", "ERROR")
+
+
+def log_signal_to_db(signal, symbol_name, db_name):
+    try:
+        conn = sqlite3.connect(db_name)
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS signal_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                time TEXT,
+                symbol TEXT,
+                signal_type TEXT,
+                composite_score REAL,
+                option_symbol TEXT,
+                option_price REAL,
+                strike_price REAL,
+                stop_loss REAL,
+                target1 REAL,
+                target2 REAL,
+                outcome TEXT DEFAULT 'PENDING',
+                outcome_pct REAL DEFAULT 0,
+                details TEXT
+            )
+        """)
+        option = signal.get("option", {})
+        targets = signal.get("targets", {})
+        cur.execute("""
+            INSERT INTO signal_history 
+            (time, symbol, signal_type, composite_score, option_symbol, 
+             option_price, strike_price, stop_loss, target1, target2, details)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            symbol_name,
+            signal["type"],
+            signal["score"],
+            option.get("symbol"),
+            option.get("option_price"),
+            option.get("strike_price"),
+            targets.get("stop_loss"),
+            targets.get("target1"),
+            targets.get("target2"),
+            json.dumps(signal, ensure_ascii=False, default=str)
+        ))
+        conn.commit()
+        conn.close()
+        state.log(f"  ✅ سیگنال در دیتابیس ذخیره شد")
+    except Exception as e:
+        state.log(f"  ❌ خطا دیتابیس: {e}", "ERROR")
+
+
+def analyze_symbol(symbol_config):
+    name = symbol_config["name"]
+    db = symbol_config["db"]
+    state.log(f"\n{'#' * 60}")
+    state.log(f"# {name}")
+    state.log(f"{'#' * 60}")
+
+    import config
+    config.UNDERLYING = name
+    config.DATABASE_NAME = db
+    config.INS_CODE = symbol_config["ins_code"]
+
+    market_data = collect_market_data(symbol_config)
+    technicals = analyze_technicals(symbol_config)
+    options_analysis = analyze_options(symbol_config, technicals["action"], technicals["confidence"], technicals["price"])
+    signal = generate_multi_layer_signal(symbol_config, technicals, options_analysis, market_data.get("market", {}))
+
+    if signal["type"] != "WATCH":
+        send_notification(signal, name)
+        log_signal_to_db(signal, name, db)
+        state.signals_generated += 1
+        state.last_signal_time = datetime.now()
+
+    print(signal.get("message", f"\n{name}: {signal['type']} (امتیاز: {signal['score']})"))
+    print()
+
+    return signal
+
+
+def run_cycle():
+    state.cycles += 1
+    print("\n" + "=" * 60)
+    print(f"🔄 سیکل #{state.cycles} | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 60)
+
+    signals = []
+    for sym in CONFIG["symbols"]:
+        try:
+            signal = analyze_symbol(sym)
+            signals.append(signal)
+        except Exception as e:
+            state.log(f"❌ خطا در تحلیل {sym['name']}: {e}", "ERROR")
+
+    if CONFIG["dashboard_enabled"]:
+        try:
+            dash = get_module("dashboard")
+            if dash:
+                dash.generate()
+                state.log("📊 داشبورد بروزرسانی شد")
+        except Exception as e:
+            state.log(f"⚠️ خطا داشبورد: {e}", "WARN")
+
+    return signals
+
+
+def market_is_open():
+    now = datetime.now()
+    if now.weekday() in (3, 4):
+        return False
+    return CONFIG["market_open"] <= now.time() <= CONFIG["market_close"]
+
+
+def run():
+    print("╔" + "═" * 58 + "╗")
+    print("║" + "  AHRAM AI PRO v3.0  ".center(58) + "║")
+    print("║" + "  سیستم معامله‌گری تجمیعی آپشن  ".center(58) + "║")
+    print("╚" + "═" * 58 + "╝")
+    print()
+    print(f"📊 نمادها: {', '.join(s['name'] for s in CONFIG['symbols'])}")
+    print(f"⏰ ساعات: {CONFIG['market_open']} - {CONFIG['market_close']}")
+    print(f"🔄 سیکل: هر {CONFIG['cycle_seconds']} ثانیه")
+    print()
+
+    while True:
+        try:
+            if market_is_open():
+                run_cycle()
+                state.log(f"\n⏳ سیکل بعدی در {CONFIG['cycle_seconds']} ثانیه...")
+                time.sleep(CONFIG["cycle_seconds"])
+            else:
+                now = datetime.now().strftime("%H:%M")
+                print(f"\r[{now}] بازار بسته. در انتظار...", end="", flush=True)
+                time.sleep(120)
+        except KeyboardInterrupt:
+            print("\n\n🛑 سیستم متوقف شد.")
+            state.log(f"📊 آمار: {state.cycles} سیکل | {state.signals_generated} سیگنال")
+            break
+        except Exception as e:
+            state.log(f"❌ خطا: {e}", "ERROR")
+            time.sleep(30)
+
+
+if __name__ == "__main__":
+    if "--test" in sys.argv:
+        run_cycle()
+    else:
+        run()

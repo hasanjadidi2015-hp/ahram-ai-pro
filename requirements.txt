@@ -1,0 +1,5 @@
+requests
+pandas
+jdatetime
+scikit-learn
+win11toast
