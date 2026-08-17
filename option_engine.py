@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-AHRAM OPTION ENGINE  —  بلک‌شولز + IV + Greeks + theta-aware
-
-بهبودها:
-  ✅ omega (اهرم واقعی = delta × S/price)
-  ✅ theta_burn_pct (درصد ریزش روزانه)
-  ✅ جریمه‌ی IV متناسب + طبقه‌بندی حباب (iv_bubble)
-  ✅ HV از دیتای روزانه (نه اینترادی)
-  ✅ یونانی‌ها (delta/gamma/theta/vega) با IV بازار محاسبه می‌شن (هماهنگ با بازار)؛
-     ارزش‌گذاری و fog همچنان HV را به‌عنوان مرجع استفاده می‌کنند.
+AHRAM OPTION ENGINE — بلک‌شولز + IV + Greeks + theta-aware
+نسخه اصلاح‌شده: نیوتن-رافسون با fallback امن
 """
 import math
 import sqlite3
@@ -16,9 +9,6 @@ import sqlite3
 import config
 
 
-# ============================================================
-#  توابع توزیع نرمال استاندارد (جایگزین scipy)
-# ============================================================
 def _norm_cdf(x):
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
@@ -27,15 +17,10 @@ def _norm_pdf(x):
     return math.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
 
 
-# ============================================================
-#  نوسان‌پذیری تاریخی (Historical Volatility) — از دیتای روزانه
-# ============================================================
 def compute_historical_volatility(lookback=30):
-    """نوسان‌پذیری واقعی (سالانه‌شده) از قیمت‌های روزانه."""
     try:
         conn = sqlite3.connect(config.DATABASE_NAME)
         cur = conn.cursor()
-        # یک قیمت در هر روز (آخرین تیکِ روز) → returnsِ روزانه‌ی واقعی
         cur.execute(
             """
             SELECT last_price FROM prices
@@ -76,9 +61,6 @@ def compute_historical_volatility(lookback=30):
     return round(annualized, 4)
 
 
-# ============================================================
-#  آستانه‌های خروج پویا
-# ============================================================
 def get_dynamic_exit_thresholds(days_left):
     try:
         d = int(days_left)
@@ -95,15 +77,11 @@ def get_dynamic_exit_thresholds(days_left):
     return {"take_profit_pct": 60.0, "stop_loss_pct": -25.0}
 
 
-# ============================================================
-#  موتور قیمت‌گذاری
-# ============================================================
 class OptionEngine:
     def __init__(self):
         pass
 
     def _bs(self, S, K, T, r, sigma, option_type="CALL"):
-        """بلک‌شولز: قیمت + یونانی‌ها."""
         empty = {"fair_value": 0.0, "delta": 0.0, "gamma": 0.0,
                  "theta": 0.0, "vega": 0.0, "d1": 0.0, "d2": 0.0}
         if T <= 0 or S <= 0 or K <= 0 or sigma <= 0:
@@ -136,28 +114,47 @@ class OptionEngine:
                 "theta": theta, "vega": vega, "d1": d1, "d2": d2}
 
     def _implied_vol(self, market_price, S, K, T, r, option_type="CALL"):
-        """استخراج IV با نیوتن-رافسون."""
+        """استخراج IV با نیوتن-رافسون + fallback امن."""
         if market_price <= 0 or T <= 0 or S <= 0 or K <= 0:
             return None
         intrinsic = max(0, S - K) if option_type == "CALL" else max(0, K - S)
-        if market_price < intrinsic:
+        if market_price < intrinsic * 0.95:
             return None
 
         sigma = 0.6
-        for _ in range(80):
+        best_sigma = sigma
+        best_diff = abs(market_price)
+
+        for i in range(100):
             g = self._bs(S, K, T, r, sigma, option_type)
             diff = g["fair_value"] - market_price
+
+            if abs(diff) < abs(best_diff):
+                best_diff = abs(diff)
+                best_sigma = sigma
+
             if abs(diff) < 0.5:
                 return sigma
+
             vega_raw = g["vega"] * 100.0
-            if vega_raw < 1e-6:
+            if vega_raw < 1e-8:
                 break
-            sigma = sigma - diff / vega_raw
-            if sigma <= 0.02:
-                sigma = 0.02
+
+            step = diff / vega_raw
+            sigma = sigma - step
+
+            if sigma < 0.05:
+                sigma = 0.05 + (0.05 - sigma) * 0.1
             elif sigma > 5.0:
                 sigma = 5.0
-        return sigma
+
+            if i > 20 and abs(diff) > best_diff * 2:
+                break
+
+        if best_diff < market_price * 0.1:
+            return best_sigma
+
+        return None
 
     def black_scholes(self, stock_price, strike_price, days_to_expire,
                       volatility=None, risk_free=None, option_type="CALL"):
@@ -185,7 +182,6 @@ class OptionEngine:
         volume = float(volume or 0)
         r = config.RISK_FREE_RATE
 
-        # نوسان‌پذیری پایه (HV) — برای ارزش‌گذاری و fog
         if historical_volatility and historical_volatility > 0:
             vol = historical_volatility
         else:
@@ -194,11 +190,9 @@ class OptionEngine:
 
         T = max(days_to_expire, 0) / 365.0
 
-        # ارزش منصفانه و یونانیِ اولیه با HV (برای valuation)
         greeks = self._bs(stock_price, strike_price, T, r, vol, option_type)
         fair_value = greeks["fair_value"]
 
-        # ارزش ذاتی/زمانی و نقطه‌ی سربه‌سر
         if option_type == "PUT":
             intrinsic = max(0, strike_price - stock_price)
             break_even = strike_price - option_price
@@ -208,7 +202,6 @@ class OptionEngine:
         time_value = option_price - intrinsic
         leverage = (stock_price / option_price) if option_price > 0 else 0
 
-        # کیفیت داده
         data_quality = "OK"
         warnings = []
         if option_price < intrinsic:
@@ -217,7 +210,6 @@ class OptionEngine:
         if volume <= 0:
             warnings.append("LOW LIQUIDITY")
 
-        # ارزش‌گذاری (بر اساس HV)
         if data_quality == "INVALID":
             valuation = "INVALID"
         elif option_price < fair_value:
@@ -227,7 +219,6 @@ class OptionEngine:
         else:
             valuation = "FAIR"
 
-        # IV + نسبتِ حباب (IV از قیمتِ بازار)
         try:
             iv = self._implied_vol(option_price, stock_price, strike_price, T, r, option_type)
         except Exception:
@@ -252,7 +243,6 @@ class OptionEngine:
             else:
                 iv_bubble = "EXTREME"
 
-        # 🆕 یونانی‌ها را با IV بازار محاسبه کن (هماهنگ با بازار)؛ اگه IV نبود همان HV
         if iv is not None and iv == iv and iv > 0:
             greeks = self._bs(stock_price, strike_price, T, r, iv, option_type)
             greeks_vol = "IV"
@@ -262,19 +252,15 @@ class OptionEngine:
         delta = greeks["delta"]
         d2 = greeks["d2"]
 
-        # اهرم واقعی (omega) و ریزش روزانه (theta_burn) — حالا مبتنی بر یونانیِ IV
         omega = (delta * stock_price / option_price) if option_price > 0 else 0.0
         theta_burn_pct = (abs(greeks["theta"]) / option_price * 100.0) if option_price > 0 else 0.0
 
         distance_pct = (round(((strike_price - stock_price) / stock_price) * 100, 2)
                         if stock_price > 0 else 0)
 
-        # ============================================================
-        #  🎯 امتیاز کیفیت نوسان‌گیری
-        # ============================================================
         ad = abs(delta)
         if 0.45 <= ad <= 0.70:
-            _delta_score = 1.0          # ATM ایده‌آل
+            _delta_score = 1.0
         elif (0.30 <= ad < 0.45) or (0.70 < ad <= 0.80):
             _delta_score = 0.5
         else:
@@ -290,7 +276,6 @@ class OptionEngine:
 
         risk_reward_ratio = round(_delta_score * 2.0 + _liq - _iv_pen - _theta_pen, 3)
 
-        # احتمال سود (مبتنی بر d2 از IV)
         if T > 0:
             pop = (_norm_cdf(-d2) if option_type == "PUT" else _norm_cdf(d2)) * 100
             probability_of_profit = round(max(0.0, min(100.0, pop)), 1)
@@ -303,15 +288,15 @@ class OptionEngine:
             "option_type": option_type, "volume": volume,
             "intrinsic": round(intrinsic, 2), "time_value": round(time_value, 2),
             "leverage": round(leverage, 2),
-            "omega": round(omega, 2),                      # اهرم واقعی
-            "theta_burn_pct": round(theta_burn_pct, 2),     # ریزش روزانه ٪
+            "omega": round(omega, 2),
+            "theta_burn_pct": round(theta_burn_pct, 2),
             "break_even": round(break_even, 2),
             "fair_value": round(fair_value, 2), "delta": round(delta, 3),
             "gamma": round(greeks["gamma"], 5), "theta": round(greeks["theta"], 3),
             "vega": round(greeks["vega"], 3), "valuation": valuation,
             "data_quality": data_quality, "warnings": warnings,
             "volatility_used": volatility_used, "implied_volatility": implied_volatility,
-            "greeks_vol": greeks_vol,                       # 🆕 یونانی‌ها با IV یا HV؟
+            "greeks_vol": greeks_vol,
             "iv_premium_ratio": iv_premium_ratio, "iv_crush_risk": iv_crush_risk,
             "iv_bubble": iv_bubble,
             "distance_pct": distance_pct, "risk_reward_ratio": risk_reward_ratio,

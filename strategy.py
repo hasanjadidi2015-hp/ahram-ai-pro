@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-AHRAM STRATEGY - نسخه نهایی
-قادرت‌محور + مومنتوم + صف + Fibonacci + RSI Divergence
+AHRAM STRATEGY - نسخه نهایی اصلاح‌شده
+۹ اندیکاتور + EMA/MACD/ADX + Fibonacci + RSI Divergence
 """
 import sqlite3
 from datetime import datetime, time as dtime
@@ -21,6 +21,9 @@ from bollinger import Bollinger
 from rsi import RSI
 from fibonacci import Fibonacci
 from rsi_divergence import RSIDivergence
+from ema import EMA
+from macd import MACD
+from adx import ADX
 
 
 class Strategy:
@@ -29,7 +32,7 @@ class Strategy:
     SELL_THRESHOLD = getattr(config, "SELL_THRESHOLD", -45)
     MIN_ALIGNED_INDICATORS = getattr(config, "MIN_ALIGNED_INDICATORS", 4)
 
-    TOTAL_INDICATORS = 9
+    TOTAL_INDICATORS = 12
 
     QUIET_START_MINUTES = 3
     QUIET_END_MINUTES = 3
@@ -53,6 +56,9 @@ class Strategy:
         self.boll = None
         self.fib = None
         self.rsi_div = None
+        self.ema_obj = None
+        self.macd_obj = None
+        self.adx_obj = None
         self.ha_strength = 50.0
         self.queue_type = None
         self.queue_gap = 0.0
@@ -146,17 +152,23 @@ class Strategy:
         mtf_c = 1.0 if mtf_signal == "BULLISH" else (-1.0 if mtf_signal == "BEARISH" else 0.0)
         fib_c = self._conviction(self.fib.strength) if self.fib else 0.0
         rsi_div_c = self._conviction(self.rsi_div.strength) if self.rsi_div else 0.0
+        ema_c = self._conviction(self.ema_obj.strength) if self.ema_obj else 0.0
+        macd_c = self._conviction(self.macd_obj.strength) if self.macd_obj else 0.0
+        adx_c = self._conviction(self.adx_obj.strength) if self.adx_obj else 0.0
 
         parts = [
-            ("Ichimoku", ich_c, 15),
-            ("VWAP", vwap_c, 8),
-            ("Price Action", pa_c, 12),
-            ("Market Regime", regime_c, 12),
-            ("Heikin Ashi", ha_c, 12),
-            ("Multi-Timeframe", mtf_c, 12),
-            ("Bollinger", boll_c, 8),
-            ("Fibonacci", fib_c, 11),
-            ("RSI Divergence", rsi_div_c, 10),
+            ("Ichimoku", ich_c, 12),
+            ("VWAP", vwap_c, 6),
+            ("Price Action", pa_c, 10),
+            ("Market Regime", regime_c, 10),
+            ("Heikin Ashi", ha_c, 10),
+            ("Multi-Timeframe", mtf_c, 10),
+            ("Bollinger", boll_c, 6),
+            ("Fibonacci", fib_c, 9),
+            ("RSI Divergence", rsi_div_c, 8),
+            ("EMA", ema_c, 7),
+            ("MACD", macd_c, 6),
+            ("ADX", adx_c, 6),
         ]
 
         score = sum(conv * weight for _, conv, weight in parts)
@@ -206,6 +218,15 @@ class Strategy:
         self.rsi_div = RSIDivergence(self.df)
         rsi_div_signal = self.rsi_div.calculate()
 
+        self.ema_obj = EMA(self.df)
+        ema_signal = self.ema_obj.calculate()
+
+        self.macd_obj = MACD(self.df)
+        macd_signal = self.macd_obj.calculate()
+
+        self.adx_obj = ADX(self.df)
+        adx_signal = self.adx_obj.calculate()
+
         recent_prices = self.df["last_price"].tail(self.STALE_PRICE_TICKS)
         flat = len(recent_prices) >= self.STALE_PRICE_TICKS and recent_prices.nunique() == 1
         stale_price = False
@@ -244,7 +265,6 @@ class Strategy:
         enough_agreement = aligned_count >= self.MIN_ALIGNED_INDICATORS
         quiet_period = self._in_quiet_period()
 
-        # RSI VETO شرطی
         rsi_veto = False
         if rsi_value is not None and self.queue_type is None:
             if score <= self.SELL_THRESHOLD and rsi_value <= self.RSI_OVERSOLD:
@@ -254,8 +274,6 @@ class Strategy:
         if self.queue_type is not None and rsi_value is not None:
             print(f"RSI VETO BYPASS: صف {self.queue_type} تشخیص -> RSI خنثی نشد")
 
-        # ✅ اصلاح: STALE PRICE فقط وقتی واقعاً راکده
-        # اگه صف تشخیص داده شد، STALE PRICE مانع نشه
         if stale_price and self.queue_type is None:
             action = "WATCH"
             print("STALE PRICE: قیمت راکد -> WATCH اجباری")
@@ -283,6 +301,12 @@ class Strategy:
             print(f"[FIB] zone={self.fib.current_zone} | support={self.fib.nearest_support} | resistance={self.fib.nearest_resistance}")
         if self.rsi_div:
             print(f"[RSI-DIV] {self.rsi_div.divergence_type or 'NONE'} | RSI={self.rsi_div.details.get('current_rsi')}")
+        if self.ema_obj:
+            print(f"[EMA] {ema_signal} | strength={self.ema_obj.strength}")
+        if self.macd_obj:
+            print(f"[MACD] {macd_signal} | strength={self.macd_obj.strength}")
+        if self.adx_obj:
+            print(f"[ADX] {adx_signal} | strength={self.adx_obj.strength}")
 
         return (action, confidence, round(score, 1), price)
 
