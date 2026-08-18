@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-AHRAM AI - BACKTEST v3 (سریع + 13 اندیکاتور)
+AHRAM AI - BACKTEST v4 (کامل)
+اندیکاتورها + Price Action + Heikin Ashi + اخبار
 """
 import sys
 import sqlite3
@@ -28,7 +29,9 @@ def load_data():
     return [{"date": r[0], "close": float(r[1])} for r in data if r[1] and float(r[1]) > 0]
 
 
-def calc_ema_fast(prices, period):
+# ===== اندیکاتورهای پایه =====
+
+def calc_ema(prices, period):
     if len(prices) < period:
         return prices[-1]
     m = 2 / (period + 1)
@@ -51,14 +54,12 @@ def calc_rsi(prices, period=14):
     return 100 - (100 / (1 + ag / al))
 
 
-def calc_macd_fast(prices):
+def calc_macd(prices):
     if len(prices) < 26:
         return 0, 0
-    e12 = calc_ema_fast(prices, 12)
-    e26 = calc_ema_fast(prices, 26)
-    macd = e12 - e26
-    signal = macd * 0.85
-    return macd, signal
+    e12 = calc_ema(prices, 12)
+    e26 = calc_ema(prices, 26)
+    return e12 - e26, (e12 - e26) * 0.85
 
 
 def calc_bollinger(prices, period=20):
@@ -190,6 +191,113 @@ def calc_vwap(prices):
     return "NEUTRAL"
 
 
+# ===== Heikin Ashi =====
+
+def calc_heikin_ashi(prices):
+    """محاسبه Heikin Ashi و تشخیص روند"""
+    if len(prices) < 5:
+        return "NEUTRAL"
+    
+    # محاسبه Heikin Ashi
+    ha_close = (prices[-1] + prices[-2] + prices[-3] + prices[-4]) / 4
+    ha_open = (prices[-2] + prices[-3]) / 2
+    
+    # تشخیص روند
+    if ha_close > ha_open:
+        # کندل سبز
+        if prices[-1] > prices[-2] > prices[-3]:
+            return "BUY"  # روند صعودی قوی
+        return "BUY"
+    elif ha_close < ha_open:
+        # کندل قرمز
+        if prices[-1] < prices[-2] < prices[-3]:
+            return "SELL"  # روند نزولی قوی
+        return "SELL"
+    return "NEUTRAL"
+
+
+# ===== Price Action پیشرفته =====
+
+def calc_price_action(prices):
+    """تشخیص الگوهای کندلی"""
+    if len(prices) < 5:
+        return "NEUTRAL"
+    
+    signals = []
+    
+    # الگوی Engulfing صعودی
+    if prices[-2] < prices[-3] and prices[-1] > prices[-2] and prices[-1] > prices[-3]:
+        signals.append("BUY")
+    
+    # الگوی Engulfing نزولی
+    if prices[-2] > prices[-3] and prices[-1] < prices[-2] and prices[-1] < prices[-3]:
+        signals.append("SELL")
+    
+    # الگوی Hammer (چکش)
+    if prices[-1] > prices[-2] and (prices[-2] - min(prices[-3], prices[-1])) > 2 * abs(prices[-1] - prices[-2]):
+        signals.append("BUY")
+    
+    # الگوی Shooting Star (ستاره دنباله‌دار)
+    if prices[-1] < prices[-2] and (max(prices[-3], prices[-1]) - prices[-2]) > 2 * abs(prices[-1] - prices[-2]):
+        signals.append("SELL")
+    
+    # الگوی Doji (دوجی) - بی‌تصمیمی
+    if abs(prices[-1] - prices[-2]) < (max(prices[-1], prices[-2]) - min(prices[-1], prices[-2])) * 0.1:
+        return "NEUTRAL"
+    
+    # الگوی Three White Soldiers (سه سرباز سفید)
+    if prices[-1] > prices[-2] > prices[-3] > prices[-4]:
+        signals.append("BUY")
+    
+    # الگوی Three Black Crows (سه کلاغ سیاه)
+    if prices[-1] < prices[-2] < prices[-3] < prices[-4]:
+        signals.append("SELL")
+    
+    # الگوی Morning Star (ستاره صبحگاهی)
+    if prices[-3] > prices[-2] and prices[-1] > prices[-2] and prices[-1] > (prices[-3] + prices[-2]) / 2:
+        signals.append("BUY")
+    
+    # الگوی Evening Star (ستاره شامگاهی)
+    if prices[-3] < prices[-2] and prices[-1] < prices[-2] and prices[-1] < (prices[-3] + prices[-2]) / 2:
+        signals.append("SELL")
+    
+    # تصمیم‌گیری نهایی
+    buy_count = signals.count("BUY")
+    sell_count = signals.count("SELL")
+    
+    if buy_count > sell_count:
+        return "BUY"
+    elif sell_count > buy_count:
+        return "SELL"
+    return "NEUTRAL"
+
+
+# ===== تحلیل اخبار ( sentiment بازار) =====
+
+def calc_news_sentiment(prices, volumes=None):
+    """تحلیل sentiment بازار بر اساس رفتار قیمت"""
+    if len(prices) < 20:
+        return "NEUTRAL"
+    
+    # محاسبه تغییرات اخیر
+    recent_change = (prices[-1] - prices[-5]) / prices[-5] * 100
+    weekly_change = (prices[-1] - prices[-20]) / prices[-20] * 100
+    
+    # نوسانات اخیر
+    volatility = sum(abs(prices[i] - prices[i-1]) for i in range(-5, 0)) / 5
+    
+    # sentiment بر اساس رفتار قیمت
+    if recent_change > 3 and weekly_change > 5:
+        return "BUY"  # بازار مثبت
+    elif recent_change < -3 and weekly_change < -5:
+        return "SELL"  # بازار منفی
+    elif volatility > prices[-1] * 0.03:
+        return "NEUTRAL"  # نوسان زیاد = بی‌تصمیم
+    return "NEUTRAL"
+
+
+# ===== تحلیل جامع =====
+
 def get_all_signals(prices, idx):
     if idx < 52:
         return {}
@@ -197,9 +305,10 @@ def get_all_signals(prices, idx):
     current = p[-1]
     signals = {}
     
-    ema9 = calc_ema_fast(p, 9)
-    ema21 = calc_ema_fast(p, 21)
-    ema50 = calc_ema_fast(p, 50)
+    # اندیکاتورهای پایه
+    ema9 = calc_ema(p, 9)
+    ema21 = calc_ema(p, 21)
+    ema50 = calc_ema(p, 50)
     if current > ema9 > ema21 > ema50:
         signals["EMA"] = "BUY"
     elif current < ema9 < ema21 < ema50:
@@ -215,7 +324,7 @@ def get_all_signals(prices, idx):
     else:
         signals["RSI"] = "NEUTRAL"
     
-    macd, signal = calc_macd_fast(p)
+    macd, signal = calc_macd(p)
     if macd > signal:
         signals["MACD"] = "BUY"
     elif macd < signal:
@@ -240,13 +349,10 @@ def get_all_signals(prices, idx):
     signals["ADX"] = calc_adx(p)
     signals["Momentum"] = calc_momentum(p)
     
-    if len(p) >= 3:
-        if p[-1] > p[-2] > p[-3]:
-            signals["Price_Action"] = "BUY"
-        elif p[-1] < p[-2] < p[-3]:
-            signals["Price_Action"] = "SELL"
-        else:
-            signals["Price_Action"] = "NEUTRAL"
+    # اندیکاتورهای جدید
+    signals["Heikin_Ashi"] = calc_heikin_ashi(p)
+    signals["Price_Action"] = calc_price_action(p)
+    signals["News_Sentiment"] = calc_news_sentiment(p)
     
     return signals
 
@@ -258,7 +364,8 @@ def get_combined_signal(signals):
     weights = {
         "Ichimoku": 3, "RSI": 2.5, "MACD": 2.5, "Fibonacci": 2,
         "EMA": 2, "Bollinger": 1.5, "VWAP": 1.5, "ADX": 1.5,
-        "Stochastic": 1, "CCI": 1, "Williams_R": 1, "Momentum": 1, "Price_Action": 1,
+        "Heikin_Ashi": 2.5, "Price_Action": 2, "News_Sentiment": 1.5,
+        "Stochastic": 1, "CCI": 1, "Williams_R": 1, "Momentum": 1,
     }
     
     buy_score = 0
@@ -360,7 +467,7 @@ def run_backtest(records):
 
 def print_report(trades, indicator_stats):
     print(f"\n{'='*60}")
-    print(f"📊 گزارش بک‌تست اهرم (13 اندیکاتور)")
+    print(f"📊 گزارش بک‌تست اهرم (کامل)")
     print(f"{'='*60}")
     
     if not trades:
@@ -390,7 +497,11 @@ def print_report(trades, indicator_stats):
     print(f"\n  {'اندیکاتور':<15} {'BUY':<12} {'SELL':<12} {'دقت BUY':<10} {'دقت SELL':<10}")
     print(f"  {'-'*59}")
     
-    for ind in ["Ichimoku", "RSI", "MACD", "Fibonacci", "EMA", "Bollinger", "VWAP", "ADX", "Stochastic", "CCI", "Williams_R", "Momentum", "Price_Action"]:
+    all_indicators = ["Ichimoku", "RSI", "MACD", "Fibonacci", "EMA", "Bollinger", "VWAP", "ADX", 
+                      "Heikin_Ashi", "Price_Action", "News_Sentiment",
+                      "Stochastic", "CCI", "Williams_R", "Momentum"]
+    
+    for ind in all_indicators:
         if ind not in indicator_stats:
             continue
         stats = indicator_stats[ind]
@@ -439,7 +550,7 @@ def print_report(trades, indicator_stats):
 
 def main():
     print("╔" + "═" * 60 + "╗")
-    print("║" + "  AHRAM AI - BACKTEST v3 (13 اندیکاتور)  ".center(60) + "║")
+    print("║" + "  AHRAM AI - BACKTEST v4 (کامل)  ".center(60) + "║")
     print("╚" + "═" * 60 + "╝")
     
     records = load_data()
