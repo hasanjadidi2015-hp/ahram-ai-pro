@@ -444,6 +444,8 @@ def log_signal_to_db(signal, symbol_name, db_name):
     try:
         conn = sqlite3.connect(db_name)
         cur = conn.cursor()
+        
+        # ایجاد جدول اگر وجود ندارد
         cur.execute("""
             CREATE TABLE IF NOT EXISTS signal_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -462,8 +464,35 @@ def log_signal_to_db(signal, symbol_name, db_name):
                 details TEXT
             )
         """)
+        
+        # بررسی و اضافه کردن ستون‌های جدید اگر نیاز باشه
+        cur.execute("PRAGMA table_info(signal_history)")
+        columns = [row[1] for row in cur.fetchall()]
+        
+        required_columns = {
+            "option_symbol": "TEXT",
+            "option_price": "REAL",
+            "strike_price": "REAL",
+            "stop_loss": "REAL",
+            "target1": "REAL",
+            "target2": "REAL",
+            "composite_score": "REAL",
+            "signal_type": "TEXT",
+        }
+        
+        for col_name, col_type in required_columns.items():
+            if col_name not in columns:
+                try:
+                    cur.execute(f"ALTER TABLE signal_history ADD COLUMN {col_name} {col_type}")
+                    state.log(f"  [DB] ستون {col_name} اضافه شد")
+                except:
+                    pass
+        
+        conn.commit()
+        
         option = signal.get("option", {})
         targets = signal.get("targets", {})
+        
         cur.execute("""
             INSERT INTO signal_history 
             (time, symbol, signal_type, composite_score, option_symbol, 
@@ -482,6 +511,7 @@ def log_signal_to_db(signal, symbol_name, db_name):
             targets.get("target2"),
             json.dumps(signal, ensure_ascii=False, default=str)
         ))
+        
         conn.commit()
         conn.close()
         state.log(f"  ✅ سیگنال در دیتابیس ذخیره شد")
