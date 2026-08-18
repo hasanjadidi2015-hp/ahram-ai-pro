@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ╔══════════════════════════════════════════════════════════════╗
-║              AHRAM AI PRO v3.0 - نسخه نهایی                 ║
+║              AHRAM AI PRO v4.0 - نسخه نهایی                 ║
 ║         سیستم معامله‌گری تجمیعی آپشن بورس ایران              ║
 ╚══════════════════════════════════════════════════════════════╝
 """
@@ -18,7 +18,7 @@ except:
     pass
 
 CONFIG = {
-    "version": "3.0",
+    "version": "4.0",
     "name": "AHRAM AI PRO",
     "symbols": [
         {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db", "option_root": "هرم", "queue_gap": 4.0},
@@ -28,12 +28,12 @@ CONFIG = {
     "market_open": dtime(9, 0),
     "market_close": dtime(12, 30),
     "cycle_seconds": 300,
-    "min_score": 60,
-    "min_indicators": 4,
+    "min_score": 45,
+    "min_indicators": 3,
     "min_volume_ratio": 1.0,
     "max_wiv_for_buy": 85,
     "max_positions": 3,
-    "risk_per_trade": 0.02,
+    "risk_per_trade": 0.05,
     "capital": 100_000_000,
     "telegram_enabled": True,
     "desktop_enabled": True,
@@ -109,6 +109,9 @@ def get_module(name):
             elif name == "database":
                 from database import create_database
                 _modules[name] = create_database
+            elif name == "volume":
+                from volume_analysis import VolumeAnalysis, PutCallRatio, OpenInterestAnalysis
+                _modules[name] = {"vol": VolumeAnalysis, "pcr": PutCallRatio, "oi": OpenInterestAnalysis}
             else:
                 _modules[name] = None
         except Exception as e:
@@ -196,8 +199,9 @@ def analyze_technicals(symbol_config):
 
 def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
     name = symbol_config["name"]
+    db = symbol_config["db"]
     state.log(f"🎯 تحلیل آپشن: {name}")
-    result = {"selected": None, "wiv": None, "fog": None, "tape": None}
+    result = {"selected": None, "wiv": None, "fog": None, "tape": None, "volume_analysis": None}
 
     try:
         OptionSelector = get_module("option_selector")
@@ -228,7 +232,6 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
         fog_measure = get_module("fog_meter")
         if fog_measure:
             price = stock_price or 0
-            db = symbol_config["db"]
             level, ratio, advice = fog_measure(price, db)
             result["fog"] = {"level": level, "ratio": ratio, "advice": advice}
             state.log(f"  ✅ FOG: {level} ({ratio})")
@@ -244,6 +247,29 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
                 state.log(f"  ✅ TAPE: {score}/5")
     except Exception as e:
         state.log(f"  ⚠️ خطا TAPE: {e}", "WARN")
+
+    # تحلیل حجم
+    vol_mod = get_module("volume")
+    if vol_mod:
+        try:
+            vol_analysis = vol_mod["vol"](db)
+            vol_signal = vol_analysis.calculate()
+            
+            pcr = vol_mod["pcr"](db)
+            pcr_signal = pcr.calculate()
+            
+            oi = vol_mod["oi"](db)
+            oi_signal = oi.calculate()
+            
+            result["volume_analysis"] = {
+                "volume": vol_signal,
+                "put_call": pcr_signal,
+                "open_interest": oi_signal,
+                "details": vol_analysis.details,
+            }
+            state.log(f"  ✅ تحلیل حجم: {vol_signal} | Put/Call: {pcr_signal} | OI: {oi_signal}")
+        except Exception as e:
+            state.log(f"  ⚠️ خطا تحلیل حجم: {e}", "WARN")
 
     return result
 
@@ -311,6 +337,18 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
             reasons.append(f"✅ TAPE: {tape_data.get('score')}/5")
         else:
             reasons.append(f"⚠️ TAPE: {tape_data.get('score')}/5")
+
+    # بررسی تحلیل حجم
+    vol_data = options_analysis.get("volume_analysis")
+    if vol_data:
+        vol_final = vol_data.get("volume", "NEUTRAL")
+        if vol_final == "BUY":
+            checks["volume_ok"] = True
+            reasons.append(f"✅ حجم: صعودی")
+        elif vol_final == "SELL":
+            reasons.append(f"❌ حجم: نزولی")
+        else:
+            reasons.append(f"⚠️ حجم: خنثی")
 
     indices = market_data.get("indices")
     money_flow = market_data.get("money_flow")
@@ -445,7 +483,6 @@ def log_signal_to_db(signal, symbol_name, db_name):
         conn = sqlite3.connect(db_name)
         cur = conn.cursor()
         
-        # ایجاد جدول اگر وجود ندارد
         cur.execute("""
             CREATE TABLE IF NOT EXISTS signal_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -465,7 +502,6 @@ def log_signal_to_db(signal, symbol_name, db_name):
             )
         """)
         
-        # بررسی و اضافه کردن ستون‌های جدید اگر نیاز باشه
         cur.execute("PRAGMA table_info(signal_history)")
         columns = [row[1] for row in cur.fetchall()]
         
@@ -484,7 +520,6 @@ def log_signal_to_db(signal, symbol_name, db_name):
             if col_name not in columns:
                 try:
                     cur.execute(f"ALTER TABLE signal_history ADD COLUMN {col_name} {col_type}")
-                    state.log(f"  [DB] ستون {col_name} اضافه شد")
                 except:
                     pass
         
@@ -584,7 +619,7 @@ def market_is_open():
 
 def run():
     print("╔" + "═" * 58 + "╗")
-    print("║" + "  AHRAM AI PRO v3.0  ".center(58) + "║")
+    print("║" + "  AHRAM AI PRO v4.0  ".center(58) + "║")
     print("║" + "  سیستم معامله‌گری تجمیعی آپشن  ".center(58) + "║")
     print("╚" + "═" * 58 + "╝")
     print()
