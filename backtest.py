@@ -1,176 +1,297 @@
 # -*- coding: utf-8 -*-
 """
-AHRAM AI - BACKTEST ENGINE
-بک‌تست با دیتای محلی دیتابیس
+AHRAM AI - BACKTEST v3 (سریع + 13 اندیکاتور)
 """
 import sys
 import sqlite3
 import math
-from datetime import datetime
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except:
     pass
 
-# ===== تنظیمات =====
 DB_FILE = "ahram_v2.db"
 INITIAL_CAPITAL = 100_000_000
 RISK_PER_TRADE = 0.05
 COMMISSION = 0.0015
 STOP_LOSS_PCT = 0.12
 TAKE_PROFIT_PCT = 0.20
-BUY_THRESHOLD = 55
-SELL_THRESHOLD = 45
-MIN_ALIGNED = 3
 
 
-# ===== دریافت دیتا از دیتابیس =====
 def load_data():
-    """بارگذاری دیتا از SQLite"""
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        cur = conn.cursor()
-        cur.execute("SELECT time, last_price FROM prices WHERE last_price>0 ORDER BY id")
-        data = cur.fetchall()
-        conn.close()
-        
-        records = []
-        for row in data:
-            try:
-                price = float(row[1])
-                if price > 0:
-                    records.append({"date": row[0], "close": price})
-            except:
-                continue
-        
-        print(f"  ✅ {len(records)} رکورد بارگذاری شد")
-        return records
-    except Exception as e:
-        print(f"  ❌ خطا: {e}")
-        return []
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("SELECT time, last_price FROM prices WHERE last_price>0 ORDER BY id")
+    data = cur.fetchall()
+    conn.close()
+    return [{"date": r[0], "close": float(r[1])} for r in data if r[1] and float(r[1]) > 0]
 
 
-# ===== اندیکاتورها =====
-def calc_ema(prices, period):
+def calc_ema_fast(prices, period):
     if len(prices) < period:
         return prices[-1]
-    multiplier = 2 / (period + 1)
+    m = 2 / (period + 1)
     ema = sum(prices[:period]) / period
-    for price in prices[period:]:
-        ema = (price - ema) * multiplier + ema
+    for p in prices[period:]:
+        ema = (p - ema) * m + ema
     return ema
 
 
 def calc_rsi(prices, period=14):
     if len(prices) < period + 1:
         return 50
-    deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
-    gains = [d if d > 0 else 0 for d in deltas]
-    losses = [-d if d < 0 else 0 for d in deltas]
-    avg_gain = sum(gains[-period:]) / period
-    avg_loss = sum(losses[-period:]) / period
-    if avg_loss == 0:
+    d = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+    g = [x if x > 0 else 0 for x in d[-period:]]
+    l = [-x if x < 0 else 0 for x in d[-period:]]
+    ag = sum(g) / period
+    al = sum(l) / period
+    if al == 0:
         return 100
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
+    return 100 - (100 / (1 + ag / al))
 
 
-def calc_macd(prices):
+def calc_macd_fast(prices):
     if len(prices) < 26:
         return 0, 0
-    ema12 = calc_ema(prices, 12)
-    ema26 = calc_ema(prices, 26)
-    macd = ema12 - ema26
-    signal = macd * 0.8
+    e12 = calc_ema_fast(prices, 12)
+    e26 = calc_ema_fast(prices, 26)
+    macd = e12 - e26
+    signal = macd * 0.85
     return macd, signal
 
 
 def calc_bollinger(prices, period=20):
     if len(prices) < period:
         return prices[-1], prices[-1], prices[-1]
+    r = prices[-period:]
+    m = sum(r) / period
+    s = math.sqrt(sum((p - m) ** 2 for p in r) / period)
+    return m + 2 * s, m, m - 2 * s
+
+
+def calc_ichimoku(prices):
+    if len(prices) < 52:
+        return "NEUTRAL"
+    tenkan = (max(prices[-9:]) + min(prices[-9:])) / 2
+    kijun = (max(prices[-26:]) + min(prices[-26:])) / 2
+    senkou_a = (tenkan + kijun) / 2
+    senkou_b = (max(prices[-52:]) + min(prices[-52:])) / 2
+    cloud_top = max(senkou_a, senkou_b)
+    cloud_bottom = min(senkou_a, senkou_b)
+    current = prices[-1]
+    if current > cloud_top and tenkan > kijun:
+        return "BUY"
+    elif current < cloud_bottom and tenkan < kijun:
+        return "SELL"
+    return "NEUTRAL"
+
+
+def calc_fibonacci(prices):
+    if len(prices) < 50:
+        return "NEUTRAL"
+    recent = prices[-50:]
+    high = max(recent)
+    low = min(recent)
+    current = prices[-1]
+    if high == low:
+        return "NEUTRAL"
+    position = (current - low) / (high - low)
+    if position < 0.382:
+        return "BUY"
+    elif position > 0.618:
+        return "SELL"
+    return "NEUTRAL"
+
+
+def calc_stochastic(prices, period=14):
+    if len(prices) < period:
+        return "NEUTRAL"
     recent = prices[-period:]
-    middle = sum(recent) / period
-    std = math.sqrt(sum((p - middle) ** 2 for p in recent) / period)
-    return middle + 2 * std, middle, middle - 2 * std
+    low = min(recent)
+    high = max(recent)
+    if high == low:
+        return "NEUTRAL"
+    k = (prices[-1] - low) / (high - low) * 100
+    if k < 20:
+        return "BUY"
+    elif k > 80:
+        return "SELL"
+    return "NEUTRAL"
 
 
-# ===== تحلیل استراتژی =====
-def analyze(prices, index):
-    if index < 50:
-        return "WATCH", 0
-    
-    p = prices[:index+1]
+def calc_cci(prices, period=20):
+    if len(prices) < period:
+        return "NEUTRAL"
+    recent = prices[-period:]
+    mean = sum(recent) / period
+    mean_dev = sum(abs(p - mean) for p in recent) / period
+    if mean_dev == 0:
+        return "NEUTRAL"
+    cci = (prices[-1] - mean) / (0.015 * mean_dev)
+    if cci < -100:
+        return "BUY"
+    elif cci > 100:
+        return "SELL"
+    return "NEUTRAL"
+
+
+def calc_williams_r(prices, period=14):
+    if len(prices) < period:
+        return "NEUTRAL"
+    recent = prices[-period:]
+    low = min(recent)
+    high = max(recent)
+    if high == low:
+        return "NEUTRAL"
+    wr = (high - prices[-1]) / (high - low) * -100
+    if wr < -80:
+        return "BUY"
+    elif wr > -20:
+        return "SELL"
+    return "NEUTRAL"
+
+
+def calc_adx(prices, period=14):
+    if len(prices) < period * 2:
+        return "NEUTRAL"
+    changes = [prices[i] - prices[i-1] for i in range(len(prices)-period, len(prices))]
+    plus = sum(max(0, c) for c in changes)
+    minus = sum(max(0, -c) for c in changes)
+    total = plus + minus
+    if total == 0:
+        return "NEUTRAL"
+    if plus / total > 0.6:
+        return "BUY"
+    elif minus / total > 0.6:
+        return "SELL"
+    return "NEUTRAL"
+
+
+def calc_momentum(prices, period=10):
+    if len(prices) < period + 1:
+        return "NEUTRAL"
+    mom = (prices[-1] - prices[-period]) / prices[-period] * 100
+    if mom > 5:
+        return "BUY"
+    elif mom < -5:
+        return "SELL"
+    return "NEUTRAL"
+
+
+def calc_vwap(prices):
+    if len(prices) < 20:
+        return "NEUTRAL"
+    vwap = sum(prices[-20:]) / 20
+    if prices[-1] > vwap * 1.02:
+        return "BUY"
+    elif prices[-1] < vwap * 0.98:
+        return "SELL"
+    return "NEUTRAL"
+
+
+def get_all_signals(prices, idx):
+    if idx < 52:
+        return {}
+    p = prices[:idx+1]
     current = p[-1]
-    scores = {}
+    signals = {}
     
-    # EMA
-    ema9 = calc_ema(p, 9)
-    ema21 = calc_ema(p, 21)
-    ema50 = calc_ema(p, 50)
+    ema9 = calc_ema_fast(p, 9)
+    ema21 = calc_ema_fast(p, 21)
+    ema50 = calc_ema_fast(p, 50)
     if current > ema9 > ema21 > ema50:
-        scores["EMA"] = 70
+        signals["EMA"] = "BUY"
     elif current < ema9 < ema21 < ema50:
-        scores["EMA"] = 30
+        signals["EMA"] = "SELL"
     else:
-        scores["EMA"] = 50
+        signals["EMA"] = "NEUTRAL"
     
-    # RSI
     rsi = calc_rsi(p)
     if rsi < 30:
-        scores["RSI"] = 70
+        signals["RSI"] = "BUY"
     elif rsi > 70:
-        scores["RSI"] = 30
+        signals["RSI"] = "SELL"
     else:
-        scores["RSI"] = 50
+        signals["RSI"] = "NEUTRAL"
     
-    # MACD
-    macd, signal = calc_macd(p)
+    macd, signal = calc_macd_fast(p)
     if macd > signal:
-        scores["MACD"] = 65
+        signals["MACD"] = "BUY"
     elif macd < signal:
-        scores["MACD"] = 35
+        signals["MACD"] = "SELL"
     else:
-        scores["MACD"] = 50
+        signals["MACD"] = "NEUTRAL"
     
-    # بولینگر
     upper, middle, lower = calc_bollinger(p)
     if current < lower:
-        scores["Bollinger"] = 70
+        signals["Bollinger"] = "BUY"
     elif current > upper:
-        scores["Bollinger"] = 30
+        signals["Bollinger"] = "SELL"
     else:
-        scores["Bollinger"] = 50
+        signals["Bollinger"] = "NEUTRAL"
     
-    # پرایس اکشن
+    signals["Ichimoku"] = calc_ichimoku(p)
+    signals["Fibonacci"] = calc_fibonacci(p)
+    signals["VWAP"] = calc_vwap(p)
+    signals["Stochastic"] = calc_stochastic(p)
+    signals["CCI"] = calc_cci(p)
+    signals["Williams_R"] = calc_williams_r(p)
+    signals["ADX"] = calc_adx(p)
+    signals["Momentum"] = calc_momentum(p)
+    
     if len(p) >= 3:
         if p[-1] > p[-2] > p[-3]:
-            scores["Price"] = 65
+            signals["Price_Action"] = "BUY"
         elif p[-1] < p[-2] < p[-3]:
-            scores["Price"] = 35
+            signals["Price_Action"] = "SELL"
         else:
-            scores["Price"] = 50
+            signals["Price_Action"] = "NEUTRAL"
     
-    # محاسبه امتیاز
-    weights = {"EMA": 25, "RSI": 20, "MACD": 20, "Bollinger": 15, "Price": 20}
-    total = sum(scores.get(k, 50) * w for k, w in weights.items()) / sum(weights.values())
-    
-    bullish = sum(1 for v in scores.values() if v > 55)
-    bearish = sum(1 for v in scores.values() if v < 45)
-    
-    if total >= BUY_THRESHOLD and bullish >= MIN_ALIGNED:
-        return "BUY", round(total)
-    elif total <= SELL_THRESHOLD and bearish >= MIN_ALIGNED:
-        return "SELL", round(total)
-    return "WATCH", round(total)
+    return signals
 
 
-# ===== کلاس معامله =====
+def get_combined_signal(signals):
+    if not signals:
+        return "WATCH", 0
+    
+    weights = {
+        "Ichimoku": 3, "RSI": 2.5, "MACD": 2.5, "Fibonacci": 2,
+        "EMA": 2, "Bollinger": 1.5, "VWAP": 1.5, "ADX": 1.5,
+        "Stochastic": 1, "CCI": 1, "Williams_R": 1, "Momentum": 1, "Price_Action": 1,
+    }
+    
+    buy_score = 0
+    sell_score = 0
+    total_weight = 0
+    
+    for ind, sig in signals.items():
+        w = weights.get(ind, 1)
+        total_weight += w
+        if sig == "BUY":
+            buy_score += w
+        elif sig == "SELL":
+            sell_score += w
+    
+    if total_weight == 0:
+        return "WATCH", 0
+    
+    buy_pct = buy_score / total_weight * 100
+    sell_pct = sell_score / total_weight * 100
+    
+    if buy_pct >= 45:
+        return "BUY", round(buy_pct)
+    elif sell_pct >= 45:
+        return "SELL", round(sell_pct)
+    return "WATCH", max(round(buy_pct), round(sell_pct))
+
+
 class Trade:
-    def __init__(self, entry_date, entry_price, direction):
-        self.entry_date = entry_date
-        self.entry_price = entry_price
+    def __init__(self, date, price, direction, signals):
+        self.entry_date = date
+        self.entry_price = price
         self.direction = direction
+        self.signals = signals
         self.exit_date = None
         self.exit_price = None
         self.profit_pct = 0
@@ -180,122 +301,154 @@ class Trade:
     def check_exit(self, price, date):
         if self.status != "OPEN":
             return False
-        
-        if self.direction == "BUY":
-            change = (price - self.entry_price) / self.entry_price
-        else:
-            change = (self.entry_price - price) / self.entry_price
-        
-        if change >= TAKE_PROFIT_PCT:
+        chg = (price - self.entry_price) / self.entry_price if self.direction == "BUY" else (self.entry_price - price) / self.entry_price
+        if chg >= TAKE_PROFIT_PCT:
             self.close(price, date, "TAKE PROFIT")
             return True
-        elif change <= -STOP_LOSS_PCT:
+        elif chg <= -STOP_LOSS_PCT:
             self.close(price, date, "STOP LOSS")
             return True
         return False
     
     def close(self, price, date, reason):
-        self.exit_price = price
-        self.exit_date = date
-        self.exit_reason = reason
+        self.exit_price, self.exit_date, self.exit_reason = price, date, reason
         self.status = "CLOSED"
-        
-        if self.direction == "BUY":
-            self.profit_pct = (price - self.entry_price) / self.entry_price * 100
-        else:
-            self.profit_pct = (self.entry_price - price) / self.entry_price * 100
-        
-        self.profit_pct -= COMMISSION * 200  # کارمزد
+        self.profit_pct = ((price - self.entry_price) / self.entry_price * 100) if self.direction == "BUY" else ((self.entry_price - price) / self.entry_price * 100)
+        self.profit_pct -= COMMISSION * 200
 
 
-# ===== اجرای بک‌تست =====
 def run_backtest(records):
     trades = []
-    open_trade = None
-    signals = []
+    ot = None
+    indicator_stats = {}
+    prices = [r["close"] for r in records]
     
-    for i in range(50, len(records)):
+    for i in range(52, len(records)):
         price = records[i]["close"]
         date = records[i]["date"]
         
-        # بررسی خروج
-        if open_trade and open_trade.status == "OPEN":
-            if open_trade.check_exit(price, date):
-                trades.append(open_trade)
-                open_trade = None
+        if ot and ot.status == "OPEN" and ot.check_exit(price, date):
+            trades.append(ot)
+            ot = None
         
-        # تحلیل
-        action, score = analyze([r["close"] for r in records], i)
+        signals = get_all_signals(prices, i)
+        action, _ = get_combined_signal(signals)
         
-        # ورود
-        if open_trade is None and action in ("BUY", "SELL"):
-            open_trade = Trade(date, price, action)
-            signals.append({"date": date, "action": action, "price": price, "score": score})
+        for ind, sig in signals.items():
+            if ind not in indicator_stats:
+                indicator_stats[ind] = {"BUY": {"wins": 0, "losses": 0}, "SELL": {"wins": 0, "losses": 0}, "NEUTRAL": 0}
+            if sig == "NEUTRAL":
+                indicator_stats[ind]["NEUTRAL"] += 1
+        
+        if ot is None and action in ("BUY", "SELL"):
+            ot = Trade(date, price, action, signals)
     
-    # بستن معامله باز
-    if open_trade and open_trade.status == "OPEN":
-        open_trade.close(records[-1]["close"], records[-1]["date"], "END")
-        trades.append(open_trade)
+    if ot and ot.status == "OPEN":
+        ot.close(records[-1]["close"], records[-1]["date"], "END")
+        trades.append(ot)
     
-    return trades, signals
+    for trade in trades:
+        for ind, sig in trade.signals.items():
+            if sig in ("BUY", "SELL"):
+                if trade.profit_pct > 0:
+                    indicator_stats[ind][sig]["wins"] += 1
+                else:
+                    indicator_stats[ind][sig]["losses"] += 1
+    
+    return trades, indicator_stats
 
 
-# ===== گزارش =====
-def print_report(trades, signals):
+def print_report(trades, indicator_stats):
     print(f"\n{'='*60}")
-    print(f"📊 گزارش بک‌تست اهرم")
+    print(f"📊 گزارش بک‌تست اهرم (13 اندیکاتور)")
     print(f"{'='*60}")
     
     if not trades:
-        print("  ❌ هیچ معامله‌ای انجام نشد!")
+        print("  ❌ معامله‌ای نداشتیم!")
         return
     
     wins = [t for t in trades if t.profit_pct > 0]
     losses = [t for t in trades if t.profit_pct <= 0]
     
-    total_profit = sum(t.profit_pct for t in trades)
-    win_rate = len(wins) / len(trades) * 100 if trades else 0
-    
-    capital = INITIAL_CAPITAL
+    cap = INITIAL_CAPITAL
     for t in trades:
-        capital += capital * RISK_PER_TRADE * (t.profit_pct / 100)
+        cap += cap * RISK_PER_TRADE * (t.profit_pct / 100)
+    ret = (cap - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100
     
-    print(f"\n  📈 آمار:")
-    print(f"    کل معاملات:   {len(trades)}")
-    print(f"    برد:           {len(wins)} ({win_rate:.1f}%)")
-    print(f"    باخت:         {len(losses)} ({100-win_rate:.1f}%)")
-    print(f"    سود کل:       {total_profit:.1f}%")
+    print(f"\n  📈 آمار کلی:")
+    print(f"    کل معاملات: {len(trades)}")
+    print(f"    برد: {len(wins)} ({len(wins)/len(trades)*100:.0f}%)")
+    print(f"    باخت: {len(losses)} ({len(losses)/len(trades)*100:.0f}%)")
+    print(f"    سود کل: {sum(t.profit_pct for t in trades):.1f}%")
+    print(f"    سرمایه: {INITIAL_CAPITAL:,.0f} → {cap:,.0f}")
+    print(f"    بازده: {ret:.1f}%")
     
-    print(f"\n  💰 سرمایه:")
-    print(f"    اولیه:         {INITIAL_CAPITAL:,.0f}")
-    print(f"    نهایی:         {capital:,.0f}")
-    print(f"    بازده:         {((capital-INITIAL_CAPITAL)/INITIAL_CAPITAL*100):.1f}%")
-    
-    print(f"\n  📋 آخرین معاملات:")
-    for t in trades[-10:]:
-        emoji = "✅" if t.profit_pct > 0 else "❌"
-        print(f"    {emoji} {t.entry_date[:10]} | {t.direction} | {t.entry_price:,.0f} → {t.exit_price:,.0f} | {t.profit_pct:+.1f}% | {t.exit_reason}")
-    
-    print(f"\n  📊 سیگنال‌ها: {len(signals)}")
+    print(f"\n{'='*60}")
+    print(f"📊 عملکرد اندیکاتورها")
     print(f"{'='*60}")
+    
+    print(f"\n  {'اندیکاتور':<15} {'BUY':<12} {'SELL':<12} {'دقت BUY':<10} {'دقت SELL':<10}")
+    print(f"  {'-'*59}")
+    
+    for ind in ["Ichimoku", "RSI", "MACD", "Fibonacci", "EMA", "Bollinger", "VWAP", "ADX", "Stochastic", "CCI", "Williams_R", "Momentum", "Price_Action"]:
+        if ind not in indicator_stats:
+            continue
+        stats = indicator_stats[ind]
+        bt = stats["BUY"]["wins"] + stats["BUY"]["losses"]
+        st = stats["SELL"]["wins"] + stats["SELL"]["losses"]
+        bw = stats["BUY"]["wins"]
+        sw = stats["SELL"]["wins"]
+        ba = (bw / bt * 100) if bt > 0 else 0
+        sa = (sw / st * 100) if st > 0 else 0
+        buy_str = f"{bw}/{bt}" if bt > 0 else "-"
+        sell_str = f"{sw}/{st}" if st > 0 else "-"
+        buy_acc = f"{ba:.0f}%" if bt > 0 else "-"
+        sell_acc = f"{sa:.0f}%" if st > 0 else "-"
+        print(f"  {ind:<15} {buy_str:<12} {sell_str:<12} {buy_acc:<10} {sell_acc:<10}")
+    
+    print(f"\n{'='*60}")
+    print(f"🏆 بهترین اندیکاتورها")
+    print(f"{'='*60}")
+    
+    best = []
+    for ind, stats in indicator_stats.items():
+        bt = stats["BUY"]["wins"] + stats["BUY"]["losses"]
+        st = stats["SELL"]["wins"] + stats["SELL"]["losses"]
+        total = bt + st
+        if total >= 5:
+            bw = stats["BUY"]["wins"]
+            sw = stats["SELL"]["wins"]
+            ba = (bw / bt * 100) if bt > 0 else 0
+            sa = (sw / st * 100) if st > 0 else 0
+            avg = (ba * bt + sa * st) / total if total > 0 else 0
+            best.append((ind, avg, total, ba, sa))
+    
+    best.sort(key=lambda x: x[1], reverse=True)
+    
+    for i, (ind, avg, total, ba, sa) in enumerate(best[:5], 1):
+        e = "🥇" if i == 1 else ("🥈" if i == 2 else ("🥉" if i == 3 else "  "))
+        print(f"  {e} {ind:<15} دقت: {avg:.0f}% | BUY: {ba:.0f}% | SELL: {sa:.0f}% ({total} سیگنال)")
+    
+    print(f"\n{'='*60}")
+    print(f"📋 آخرین 10 معامله")
+    print(f"{'='*60}")
+    for t in trades[-10:]:
+        e = "✅" if t.profit_pct > 0 else "❌"
+        print(f"  {e} {t.entry_date[:10]} | {t.direction} | {t.profit_pct:+.1f}% | {t.exit_reason}")
 
 
-# ===== اصل =====
 def main():
-    print("╔" + "═" * 58 + "╗")
-    print("║" + "  AHRAM AI - BACKTEST  ".center(58) + "║")
-    print("╚" + "═" * 58 + "╝")
+    print("╔" + "═" * 60 + "╗")
+    print("║" + "  AHRAM AI - BACKTEST v3 (13 اندیکاتور)  ".center(60) + "║")
+    print("╚" + "═" * 60 + "╝")
     
     records = load_data()
-    if len(records) < 100:
-        print("❌ دیتای کافی نیست!")
-        return
+    print(f"\n  📥 دیتا: {len(records)} رکورد")
+    print(f"  📅 از {records[0]['date']} تا {records[-1]['date']}")
+    print(f"  💰 قیمت: {records[0]['close']:,.0f} → {records[-1]['close']:,.0f}")
     
-    print(f"\n  📊 دیتا: {records[0]['date']} تا {records[-1]['date']}")
-    print(f"  📈 قیمت: {records[0]['close']:,.0f} → {records[-1]['close']:,.0f}")
-    
-    trades, signals = run_backtest(records)
-    print_report(trades, signals)
+    trades, indicator_stats = run_backtest(records)
+    print_report(trades, indicator_stats)
 
 
 if __name__ == "__main__":
