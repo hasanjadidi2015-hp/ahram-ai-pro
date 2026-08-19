@@ -28,7 +28,7 @@ class WIVCalculator:
     def __init__(self, db_name=None):
         self.db = db_name or config.DATABASE_NAME
         self.engine = OptionEngine()
-        self.hv = compute_historical_volatility()
+        self.hv = compute_historical_volatility(self.db)
         self.wiv = None
         self.iv_rank = None
         self.iv_percentile = None

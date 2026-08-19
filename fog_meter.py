@@ -37,12 +37,12 @@ def measure(stock_price, db):
         atm = min(opts, key=lambda o: abs(float(o[1]) - stock_price))
     except Exception:
         return ("UNKNOWN", None, "no ATM option")
-    hv = compute_historical_volatility()
+    hv = compute_historical_volatility(db)
     if not hv or hv <= 0:
         return ("UNKNOWN", None, "no historical volatility")
     try:
         eng = OptionEngine()
-        a = eng.analyze(stock_price, float(atm[1]), float(atm[2]), int(atm[3] or 0), "CALL")
+        a = eng.analyze(stock_price, float(atm[1]), float(atm[2]), int(atm[3] or 0), "CALL", historical_volatility=hv)
     except Exception:
         return ("UNKNOWN", None, "engine error")
     ratio = a.get("iv_premium_ratio")

@@ -201,13 +201,13 @@ class Strategy:
 
         regime = MarketRegime(self.df).analyze()
 
-        heikin_signal = calculate_heikin_ashi()
+        heikin_signal = calculate_heikin_ashi(db_path=self.db_path)
         self.ha_strength = (
             _ha_module.LAST_RESULT.get("strength", 50.0)
             if isinstance(_ha_module.LAST_RESULT, dict) else 50.0
         )
 
-        mtf_signal = calculate_multi_timeframe()
+        mtf_signal = calculate_multi_timeframe(db_path=self.db_path)
 
         self.boll = Bollinger(self.df)
         bollinger_signal = self.boll.calculate()

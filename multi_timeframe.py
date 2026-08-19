@@ -1,9 +1,9 @@
 from candle_builder import build_candles
 
 
-def calculate_multi_timeframe(candle_minutes=15, min_candles=25, end_time=None):
+def calculate_multi_timeframe(candle_minutes=15, min_candles=25, end_time=None, db_path=None):
 
-    candles = build_candles(minutes=candle_minutes, end_time=end_time)
+    candles = build_candles(minutes=candle_minutes, end_time=end_time, db_path=db_path)
 
     if candles.empty or len(candles) < min_candles:
         return "NEUTRAL"

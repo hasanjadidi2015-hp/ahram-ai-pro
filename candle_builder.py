@@ -5,9 +5,9 @@ import pandas as pd
 import config
 
 
-def load_tick_data(end_time=None):
+def load_tick_data(end_time=None, db_path=None):
 
-    conn = sqlite3.connect(config.DATABASE_NAME)
+    conn = sqlite3.connect(db_path or config.DATABASE_NAME)
 
     df = pd.read_sql(
         "SELECT time, last_price FROM prices ORDER BY id",
@@ -35,10 +35,10 @@ def load_tick_data(end_time=None):
     return df
 
 
-def build_candles(minutes=15, df=None, end_time=None):
+def build_candles(minutes=15, df=None, end_time=None, db_path=None):
 
     if df is None:
-        df = load_tick_data(end_time=end_time)
+        df = load_tick_data(end_time=end_time, db_path=db_path)
 
     elif end_time is not None:
         df = df[df["time"] <= end_time]

@@ -131,12 +131,12 @@ def analyze_heikin_ashi(candles):
     return signal, ha
 
 
-def calculate_heikin_ashi(candle_minutes=15, min_candles=5, end_time=None):
+def calculate_heikin_ashi(candle_minutes=15, min_candles=5, end_time=None, db_path=None):
     """رابطِ سازگار با strategy.py — کندل‌ها رو می‌سازه و تحلیل می‌کنه."""
     global LAST_RESULT
     try:
         from candle_builder import build_candles
-        candles = build_candles(minutes=candle_minutes, end_time=end_time)
+        candles = build_candles(minutes=candle_minutes, end_time=end_time, db_path=db_path)
     except Exception as e:
         LAST_RESULT = {"error": str(e)}
         return "NEUTRAL"
