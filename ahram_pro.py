@@ -523,8 +523,8 @@ def log_signal_to_db(signal, symbol_name, db_name):
             if col_name not in columns:
                 try:
                     cur.execute(f"ALTER TABLE signal_history ADD COLUMN {col_name} {col_type}")
-                except:
-                    pass
+                except Exception as _e:
+                    state.log(f"⚠️ ستون {col_name} اضافه نشد: {_e}", "WARN")
         
         conn.commit()
         

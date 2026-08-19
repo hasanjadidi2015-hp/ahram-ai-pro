@@ -268,13 +268,16 @@ class Strategy:
         quiet_period = self._in_quiet_period()
 
         rsi_veto = False
-        if rsi_value is not None and self.queue_type is None:
+        if rsi_value is not None:
             if score <= self.SELL_THRESHOLD and rsi_value <= self.RSI_OVERSOLD:
                 rsi_veto = True
             elif score >= self.BUY_THRESHOLD and rsi_value >= self.RSI_OVERBOUGHT:
                 rsi_veto = True
         if self.queue_type is not None and rsi_value is not None:
-            print(f"RSI VETO BYPASS: صف {self.queue_type} تشخیص -> RSI خنثی نشد")
+            if rsi_veto:
+                print(f"RSI VETO حتی با صف فعال شد: صف {self.queue_type} ولی RSI={rsi_value} افراطی -> خنثی شد")
+            else:
+                print(f"RSI VETO: صف {self.queue_type} تشخیص داده شد، RSI={rsi_value} افراطی نیست -> مانعی نیست")
 
         if stale_price and self.queue_type is None:
             action = "WATCH"

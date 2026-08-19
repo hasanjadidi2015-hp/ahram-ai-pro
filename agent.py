@@ -18,42 +18,57 @@ from signal_generator import generate_signal
 try:
     import learning_core
     _HAS_LEARNING = True
-except: _HAS_LEARNING = False
+except Exception as _e:
+    _HAS_LEARNING = False
+    print(f"[WARN] learning_core بارگذاری نشد: {_e}")
 try:
     from desktop_notify import send_desktop_notification
     _HAS_DESKTOP = True
-except: _HAS_DESKTOP = False
+except Exception as _e:
+    _HAS_DESKTOP = False
+    print(f"[WARN] desktop_notify بارگذاری نشد: {_e}")
 try:
     import dashboard
     _HAS_DASHBOARD = True
-except: _HAS_DASHBOARD = False
+except Exception as _e:
+    _HAS_DASHBOARD = False
+    print(f"[WARN] dashboard بارگذاری نشد: {_e}")
 try:
     from option_collector import collect_options as _fetch_options_light
     from option_collector import UNDERLYING_INFO
     _HAS_UINFO = True
-except:
+except Exception as _e:
     _fetch_options_light = None
     _HAS_UINFO = False
+    print(f"[WARN] option_collector بارگذاری نشد: {_e}")
 try:
     from index_feed import fetch_and_save_indices as _fetch_indices
-except: _fetch_indices = None
+except Exception as _e:
+    _fetch_indices = None
+    print(f"[WARN] index_feed بارگذاری نشد: {_e}")
 try:
     from money_flow import fetch_and_save_money_flow as _fetch_money_flow
-except: _fetch_money_flow = None
+except Exception as _e:
+    _fetch_money_flow = None
+    print(f"[WARN] money_flow بارگذاری نشد: {_e}")
 try:
     from symbols_utils import resolve_ins_code
     _HAS_RESOLVE = True
-except: _HAS_RESOLVE = False
+except Exception as _e:
+    _HAS_RESOLVE = False
+    print(f"[WARN] symbols_utils بارگذاری نشد: {_e}")
 try:
     import queue_surge
     _HAS_QUEUE = True
-except:
+except Exception as _e:
     _HAS_QUEUE = False
+    print(f"[WARN] queue_surge بارگذاری نشد: {_e}")
 try:
     from wiv import WIVCalculator
     _HAS_WIV = True
-except:
+except Exception as _e:
     _HAS_WIV = False
+    print(f"[WARN] wiv بارگذاری نشد: {_e}")
 
 TRADING_STYLE = "mixed"
 MARKET_OPEN = dtime(9, 0)
@@ -291,7 +306,8 @@ def _analyze_symbol(sym, db_path):
                     too_many = True
                     print("[RISK] max positions")
                 conn.close()
-            except: pass
+            except Exception as _e:
+                print(f"[RISK] ERROR checking open positions: {_e}")
         if not too_many:
             if _HAS_LEARNING:
                 new_id = _safe(lambda: learning_core.log_signal(signal), "LOG")
