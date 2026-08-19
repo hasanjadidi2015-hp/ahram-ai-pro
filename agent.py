@@ -215,6 +215,10 @@ def _analyze_symbol(sym, db_path):
             elif rvol >= 1.5:
                 stock_confidence = min(100, stock_confidence + 10)
 
+    if price <= 0 and stock_action != "WATCH":
+        print(f"[PRICE GUARD] قیمت نامعتبر ({price}) با اکشن {stock_action} -> اجباری WATCH")
+        stock_action = "WATCH"
+
     option_decision = None
     try:
         selector = OptionSelector(db_path=db_path)

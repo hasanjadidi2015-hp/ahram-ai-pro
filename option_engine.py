@@ -118,9 +118,11 @@ class OptionEngine:
     def _implied_vol(self, market_price, S, K, T, r, option_type="CALL"):
         """استخراج IV: نیوتن-رافسون (سریع) + fallback بایسکشن (تضمین converge)."""
         if market_price <= 0 or T <= 0 or S <= 0 or K <= 0:
+            print(f"[IV] ورودی نامعتبر: price={market_price} T={T} S={S} K={K} -> IV=None")
             return None
         intrinsic = max(0, S - K) if option_type == "CALL" else max(0, K - S)
         if market_price < intrinsic * 0.95:
+            print(f"[IV] قیمت بازار ({market_price}) کمتر از ارزش ذاتی ({intrinsic}) -> IV=None")
             return None
 
         sigma = 0.6
@@ -174,6 +176,10 @@ class OptionEngine:
         # اگه نیوتن به جواب نزدیک و پایدار رسیده بود
         if not oscillating and best_diff < market_price * 0.1:
             return best_sigma
+        print(
+            f"[IV] converge نشد: oscillating={oscillating} best_sigma={round(best_sigma,3)} "
+            f"best_diff={round(best_diff,3)} market_price={market_price} -> IV=None"
+        )
         return None
 
     def black_scholes(self, stock_price, strike_price, days_to_expire,

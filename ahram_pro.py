@@ -195,6 +195,10 @@ def analyze_technicals(symbol_config):
     except Exception as e:
         state.log(f"  ❌ خطا تحلیل: {e}", "ERROR")
 
+    if result["price"] <= 0 and result["action"] != "WATCH":
+        state.log(f"  ⚠️ قیمت نامعتبر ({result['price']}) با اکشن {result['action']} -> اجباری WATCH", "WARN")
+        result["action"] = "WATCH"
+
     return result
 
 
