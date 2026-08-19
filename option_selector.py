@@ -35,10 +35,12 @@ TOP_CANDIDATES_COUNT = 3
 
 class OptionSelector:
 
-    def __init__(self):
-        self.conn = sqlite3.connect(config.DATABASE_NAME)
+    def __init__(self, db_path=None):
+        # db_path صریح گرفته می‌شه؛ اگه داده نشه، از config فعلی می‌خونه (سازگار با کد قدیمی)
+        self.db_path = db_path or config.DATABASE_NAME
+        self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
-        self._historical_volatility = compute_historical_volatility()
+        self._historical_volatility = compute_historical_volatility(self.db_path)
 
     def _fetch_candidates(self, wanted_type, limit):
         self.cursor.execute(

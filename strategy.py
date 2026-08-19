@@ -47,8 +47,10 @@ class Strategy:
     ALIGNED_CONV = 0.2
     QUEUE_GAP_MIN = 1.5
 
-    def __init__(self):
-        self.conn = sqlite3.connect(config.DATABASE_NAME)
+    def __init__(self, db_path=None):
+        # db_path صریح گرفته می‌شه؛ اگه داده نشه، از config فعلی می‌خونه (سازگار با کد قدیمی)
+        self.db_path = db_path or config.DATABASE_NAME
+        self.conn = sqlite3.connect(self.db_path)
         self.df = None
         self.ich = None
         self.vwap = None

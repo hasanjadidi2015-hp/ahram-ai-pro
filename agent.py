@@ -91,9 +91,9 @@ def _alert(title, text):
         pass
 
 
-def _volume_confirmation():
+def _volume_confirmation(db_path):
     try:
-        conn = sqlite3.connect(config.DATABASE_NAME)
+        conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         cur.execute("SELECT time, volume FROM prices ORDER BY id DESC LIMIT 25")
         rows = cur.fetchall()
@@ -124,14 +124,19 @@ def _volume_confirmation():
         return 1.0, True, f"error: {e}"
 
 
-def _analyze_symbol(sym):
+def _analyze_symbol(sym, db_path):
     name = sym["name"]
-    db = sym.get("db", "ahram_v2.db")
+
+    # چک ایمنی: اگه یه‌جا config.DATABASE_NAME سراسری desync بشه، به‌جای اجرای
+    # سایلنت با db اشتباه، همینجا با خطای واضح متوقف می‌شیم.
+    assert config.DATABASE_NAME == db_path, (
+        f"DB mismatch for {name}: config.DATABASE_NAME={config.DATABASE_NAME}, expected={db_path}"
+    )
 
     _safe(create_database, "DB")
     if _HAS_LEARNING:
         _safe(learning_core.daily_update, "LEARN")
-    hv = _safe(compute_historical_volatility, "VOL-HIST")
+    hv = _safe(lambda: compute_historical_volatility(db_path), "VOL-HIST")
     if hv:
         print(f"[VOL-HIST] {round(hv * 100, 1)}%")
     _safe(collect, "STOCK")
@@ -176,7 +181,7 @@ def _analyze_symbol(sym):
         print(f"[QUEUE] BUY call (price {int(price)})")
     else:
         try:
-            strategy = Strategy()
+            strategy = Strategy(db_path=db_path)
             result = strategy.analyze()
             try: strategy.close()
             except: pass
@@ -186,7 +191,7 @@ def _analyze_symbol(sym):
                 print("[STRATEGY] not enough data")
         except Exception as e:
             print("[STRATEGY] ERROR:", e)
-        rvol, vol_confirmed, vol_reason = _volume_confirmation()
+        rvol, vol_confirmed, vol_reason = _volume_confirmation(db_path)
         print(f"[VOL-CONFIRM] {vol_reason}")
         if stock_action in ("BUY", "SELL", "STRONG BUY", "STRONG SELL"):
             if not vol_confirmed:
@@ -197,7 +202,7 @@ def _analyze_symbol(sym):
 
     option_decision = None
     try:
-        selector = OptionSelector()
+        selector = OptionSelector(db_path=db_path)
         option_decision = selector.run(stock_action=stock_action, stock_confidence=stock_confidence, current_stock_price=price if price else None)
         selector.close()
     except Exception as e:
@@ -314,7 +319,7 @@ def run_once():
         config.OPTION_ROOT = sym.get("option_root", "")
         print(f"\n{'#' * 60}\n# {name}\n{'#' * 60}")
         try:
-            _analyze_symbol(sym)
+            _analyze_symbol(sym, db)
         except Exception as e:
             print(f"[{name}] ERROR:", e)
     if _HAS_DASHBOARD:

@@ -17,9 +17,11 @@ def _norm_pdf(x):
     return math.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
 
 
-def compute_historical_volatility(lookback=30):
+def compute_historical_volatility(db_path=None, lookback=30):
+    # db_path صریح گرفته می‌شه؛ اگه داده نشه، از config فعلی می‌خونه (سازگار با کد قدیمی)
+    db_path = db_path or config.DATABASE_NAME
     try:
-        conn = sqlite3.connect(config.DATABASE_NAME)
+        conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         cur.execute(
             """

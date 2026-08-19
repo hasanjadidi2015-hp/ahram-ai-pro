@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ╔══════════════════════════════════════════════════════════════╗
-║              AHRAM AI PRO v4.0 - نسخه نهایی                 ║
+║              AHRAM AI PRO v4.1 - نسخه نهایی                 ║
 ║         سیستم معامله‌گری تجمیعی آپشن بورس ایران              ║
 ╚══════════════════════════════════════════════════════════════╝
 """
@@ -18,7 +18,7 @@ except:
     pass
 
 CONFIG = {
-    "version": "4.0",
+    "version": "4.1",
     "name": "AHRAM AI PRO",
     "symbols": [
         {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db", "option_root": "هرم", "queue_gap": 4.0},
@@ -479,6 +479,7 @@ def send_notification(signal, symbol_name):
 
 
 def log_signal_to_db(signal, symbol_name, db_name):
+    """ذخیره تمام سیگنال‌ها (BUY و WATCH) در دیتابیس"""
     try:
         conn = sqlite3.connect(db_name)
         cur = conn.cursor()
@@ -538,12 +539,12 @@ def log_signal_to_db(signal, symbol_name, db_name):
             symbol_name,
             signal["type"],
             signal["score"],
-            option.get("symbol"),
-            option.get("option_price"),
-            option.get("strike_price"),
-            targets.get("stop_loss"),
-            targets.get("target1"),
-            targets.get("target2"),
+            option.get("symbol") if option else None,
+            option.get("option_price") if option else None,
+            option.get("strike_price") if option else None,
+            targets.get("stop_loss") if targets else None,
+            targets.get("target1") if targets else None,
+            targets.get("target2") if targets else None,
             json.dumps(signal, ensure_ascii=False, default=str)
         ))
         
@@ -572,9 +573,11 @@ def analyze_symbol(symbol_config):
     options_analysis = analyze_options(symbol_config, technicals["action"], technicals["confidence"], technicals["price"])
     signal = generate_multi_layer_signal(symbol_config, technicals, options_analysis, market_data.get("market", {}))
 
+    # ✅ ذخیره تمام سیگنال‌ها (BUY و WATCH)
+    log_signal_to_db(signal, name, db)
+    
     if signal["type"] != "WATCH":
         send_notification(signal, name)
-        log_signal_to_db(signal, name, db)
         state.signals_generated += 1
         state.last_signal_time = datetime.now()
 
@@ -619,7 +622,7 @@ def market_is_open():
 
 def run():
     print("╔" + "═" * 58 + "╗")
-    print("║" + "  AHRAM AI PRO v4.0  ".center(58) + "║")
+    print("║" + "  AHRAM AI PRO v4.1  ".center(58) + "║")
     print("║" + "  سیستم معامله‌گری تجمیعی آپشن  ".center(58) + "║")
     print("╚" + "═" * 58 + "╝")
     print()
