@@ -1,6 +1,6 @@
 import sqlite3
 
-for db in ["webmellt.db", "shasta.db"]:
+for db in ["ahram_v2.db", "webmellt.db", "shasta.db"]:
     try:
         conn = sqlite3.connect(db)
         c = conn.cursor()

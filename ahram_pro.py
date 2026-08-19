@@ -161,7 +161,7 @@ def collect_market_data(symbol_config):
 
     try:
         hv_func = get_module("option_engine")["hv"]
-        hv = hv_func()
+        hv = hv_func(db)
         data["stock"]["hv"] = hv
         if hv:
             state.log(f"  ✅ نوسان تاریخی: {round(hv*100,1)}%")
@@ -173,13 +173,14 @@ def collect_market_data(symbol_config):
 
 def analyze_technicals(symbol_config):
     name = symbol_config["name"]
+    db = symbol_config["db"]
     state.log(f"📈 تحلیل تکنیکال: {name}")
     result = {"action": "WATCH", "confidence": 0, "score": 0, "price": 0, "indicators": {}, "reasons": []}
 
     try:
         Strategy = get_module("strategy")
         if Strategy:
-            strategy = Strategy()
+            strategy = Strategy(db_path=db)
             analysis = strategy.analyze()
             strategy.close()
             if analysis:
@@ -206,7 +207,7 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
     try:
         OptionSelector = get_module("option_selector")
         if OptionSelector:
-            selector = OptionSelector()
+            selector = OptionSelector(db_path=db)
             option = selector.run(stock_action=stock_action, stock_confidence=stock_confidence, current_stock_price=stock_price)
             selector.close()
             if option:
@@ -515,6 +516,7 @@ def log_signal_to_db(signal, symbol_name, db_name):
             "target2": "REAL",
             "composite_score": "REAL",
             "signal_type": "TEXT",
+            "details": "TEXT",
         }
         
         for col_name, col_type in required_columns.items():
