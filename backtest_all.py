@@ -16,7 +16,13 @@ except:
     pass
 
 # ===== تنظیمات =====
-API_KEY = "BMDsjrQG9X4S7vqVrrW8eDXGbPHDYBeL"
+# کلید API نباید مستقیم توی کد باشه (این فایل روی گیت‌هاب عمومیه).
+# مقدارش رو توی brs_config.py بذار و اون فایل رو به .gitignore اضافه کن.
+try:
+    from brs_config import API_KEY
+except ImportError:
+    API_KEY = ""
+    print("⚠️ brs_config.py پیدا نشد — API_KEY رو اونجا تنظیم کن.")
 API_URL = "https://api.brsapi.ir/Tsetmc/History.php"
 
 SYMBOLS = {
@@ -285,20 +291,33 @@ def print_report(symbol, trades):
 
 # ===== ذخیره در دیتابیس =====
 def save_to_db(symbol, db_name, records):
+    """توجه: این تابع مستقیم توی همون دیتابیسی می‌نویسه که ربات زنده استفاده
+    می‌کنه (ahram_v2.db و غیره). قبل از درج، تاریخ‌های موجود رو چک می‌کنیم
+    که اگه این اسکریپت چندبار اجرا بشه، تاریخچه‌ی قیمت تکراری نشه."""
     try:
         conn = sqlite3.connect(db_name)
         cur = conn.cursor()
         cur.execute("""CREATE TABLE IF NOT EXISTS prices(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             time TEXT, last_price REAL, closing_price REAL, volume REAL, trades INTEGER)""")
-        
+
+        cur.execute("SELECT DISTINCT substr(time,1,10) FROM prices")
+        existing_dates = {row[0] for row in cur.fetchall() if row[0]}
+
+        inserted, skipped = 0, 0
         for r in records:
+            date_key = str(r["date"])[:10]
+            if date_key in existing_dates:
+                skipped += 1
+                continue
             cur.execute("INSERT INTO prices(time, last_price, closing_price, volume, trades) VALUES(?,?,?,?,?)",
                 (r["date"], r["close"], r["close"], r["volume"], 0))
-        
+            existing_dates.add(date_key)
+            inserted += 1
+
         conn.commit()
         conn.close()
-        print(f"  ✅ {len(records)} رکورد در {db_name} ذخیره شد")
+        print(f"  ✅ {inserted} رکورد جدید در {db_name} ذخیره شد ({skipped} رکورد تکراری رد شد)")
     except Exception as e:
         print(f"  ❌ خطا ذخیره: {e}")
 

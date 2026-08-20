@@ -313,7 +313,7 @@ class OptionSelector:
                 continue
 
             # ۳. بررسی Bid/Ask لحظه‌ای
-            candidate_bid_ask = get_option_bid_ask(candidate["symbol"])
+            candidate_bid_ask = get_option_bid_ask(candidate["symbol"], self.db_path)
 
             if not candidate_bid_ask or not candidate_bid_ask.get("ask") or not candidate_bid_ask.get("bid"):
                 print(f"SKIPPED {candidate['symbol']}: داده‌ی Bid/Ask موجود نیست")

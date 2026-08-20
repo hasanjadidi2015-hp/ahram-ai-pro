@@ -31,11 +31,11 @@ HEADERS = {
 }
 
 
-def _last_price_from_db(symbol):
+def _last_price_from_db(symbol, db_path=None):
     if _config is None:
         return None
     try:
-        conn = sqlite3.connect(_config.DATABASE_NAME)
+        conn = sqlite3.connect(db_path or _config.DATABASE_NAME)
         cur = conn.cursor()
         cur.execute(
             "SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1",
@@ -99,9 +99,9 @@ def _live_bid_ask(ins_code):
     }
 
 
-def get_option_bid_ask(symbol):
+def get_option_bid_ask(symbol, db_path=None):
     """صف خرید/فروش قرارداد. روش سریع: آخرین قیمت از دیتابیس."""
-    last = _last_price_from_db(symbol)
+    last = _last_price_from_db(symbol, db_path)
     if last and last > 0:
         return {"bid": last, "ask": last, "source": "last_price"}
     ins_code = get_option_inscode(symbol)

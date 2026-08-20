@@ -49,7 +49,8 @@ def compute(cfg, buy_i, sell_i, buy_n, buy_count_i, sell_count_i,
     if cfg.get("trades_min"):
         conds["trades"] = today_trades >= cfg["trades_min"]
     if cfg.get("inst_buy_max") is not None and cfg["inst_buy_max"] < 1.0:
-        inst_pct = (buy_n / today_vol) if today_vol else 1.0
+        # سهم حقوقی از کل حجم باید کم باشه (طبق تعریف کاربر)
+        inst_pct = (buy_i / today_vol) if today_vol else 1.0
         conds["inst_buy"] = inst_pct <= cfg["inst_buy_max"]
     if cfg.get("price_change_min") is not None:
         change = ((price - yesterday_close) / yesterday_close * 100) if yesterday_close else 0.0

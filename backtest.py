@@ -456,7 +456,10 @@ def run_backtest(records):
     
     for trade in trades:
         for ind, sig in trade.signals.items():
-            if sig in ("BUY", "SELL"):
+            # فقط وقتی جهت پیشنهادی این اندیکاتور با جهت واقعی معامله یکی باشه
+            # امتیازش ثبت می‌شه؛ وگرنه معلوم نیست اگه طبق نظر اون اندیکاتور
+            # عمل می‌کردیم چی می‌شد، پس نباید بردش/باختش رو به حساب اون گذاشت.
+            if sig == trade.direction:
                 if trade.profit_pct > 0:
                     indicator_stats[ind][sig]["wins"] += 1
                 else:
