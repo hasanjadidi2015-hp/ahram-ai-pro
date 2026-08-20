@@ -69,13 +69,14 @@ def fetch_and_save_money_flow():
         print("NO CLIENT TYPE DATA FOR AHRAM")
         return None
 
+    # طبق مستندات algotik_tse: I = حقوقی (Institutional), N = حقیقی (Natural/Retail)
     buy_i = float(ct_row.iloc[0]["Buy_I_Volume"])
     buy_n = float(ct_row.iloc[0]["Buy_N_Volume"])
     sell_i = float(ct_row.iloc[0]["Sell_I_Volume"])
     sell_n = float(ct_row.iloc[0]["Sell_N_Volume"])
 
-    net_retail = buy_i - sell_i
-    net_institutional = buy_n - sell_n
+    net_institutional = buy_i - sell_i
+    net_retail = buy_n - sell_n
 
     conn = sqlite3.connect(config.DATABASE_NAME)
     cursor = conn.cursor()

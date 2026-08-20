@@ -284,17 +284,22 @@ class ProfitPredictor:
     def __init__(self):
         self.scenarios = []
     
-    def predict(self, entry_price, strike_price, option_type="CALL", days_to_expire=30):
+    def predict(self, entry_price, strike_price, option_type="CALL", days_to_expire=30, current_stock_price=None):
         """پیش‌بینی سود در سناریوهای مختلف"""
-        
+        # سناریوها باید بر اساس قیمت واقعی سهم باشن، نه قیمت اعمال (strike) —
+        # وگرنه برای قراردادهای غیر-ATM کاملاً گمراه‌کننده می‌شه.
+        base_price = current_stock_price if current_stock_price else strike_price
+        if not current_stock_price:
+            print("⚠️ قیمت فعلی سهم داده نشده؛ سناریوها بر اساس Strike تخمین زده می‌شن (ممکنه دقیق نباشه)")
+
         scenarios = []
-        
+
         # سناریوهای مختلف تغییر قیمت سهم
         stock_changes = [-10, -5, -3, -1, 0, 1, 3, 5, 10]
-        
+
         for change_pct in stock_changes:
             # قیمت جدید سهم
-            new_stock = strike_price * (1 + change_pct / 100)
+            new_stock = base_price * (1 + change_pct / 100)
             
             # قیمت تقریبی آپشن (بسیار ساده‌شده)
             if option_type == "CALL":
@@ -360,10 +365,10 @@ def show_chain(db_name=None, symbol_filter=None, stock_price=None):
     return chain.chain
 
 
-def predict_profit(entry_price, strike_price, option_type="CALL", days_to_expire=30):
+def predict_profit(entry_price, strike_price, option_type="CALL", days_to_expire=30, current_stock_price=None):
     """پیش‌بینی سود"""
     predictor = ProfitPredictor()
-    predictor.predict(entry_price, strike_price, option_type, days_to_expire)
+    predictor.predict(entry_price, strike_price, option_type, days_to_expire, current_stock_price)
     predictor.print_prediction()
     return predictor.scenarios
 
