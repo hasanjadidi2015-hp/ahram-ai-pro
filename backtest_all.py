@@ -16,13 +16,7 @@ except:
     pass
 
 # ===== تنظیمات =====
-# کلید API نباید مستقیم توی کد باشه (این فایل روی گیت‌هاب عمومیه).
-# مقدارش رو توی brs_config.py بذار و اون فایل رو به .gitignore اضافه کن.
-try:
-    from brs_config import API_KEY
-except ImportError:
-    API_KEY = ""
-    print("⚠️ brs_config.py پیدا نشد — API_KEY رو اونجا تنظیم کن.")
+API_KEY = "BMDsjrQG9X4S7vqVrrW8eDXGbPHDYBeL"
 API_URL = "https://api.brsapi.ir/Tsetmc/History.php"
 
 SYMBOLS = {
