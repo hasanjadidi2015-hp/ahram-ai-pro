@@ -11,7 +11,7 @@ MACD_SLOW = 26
 MACD_SIGNAL = 9
 RSI_PERIOD = 14
 RISK_REWARD = 2.0
-RISK_PER_TRADE = 0.02
+RISK_PER_TRADE = 0.05
 INITIAL_CAPITAL = 100000000
 COMMISSION = 0.0015
 MIN_CONFIDENCE = 40
@@ -37,12 +37,12 @@ MOMENTUM_LOOKBACK = 5
 MOMENTUM_THRESHOLD = 0.4
 MOMENTUM_BONUS = 12
 
-# ===== تنظیمات صف (اصلاح‌شده) =====
+# ===== تنظیمات صف =====
 QUEUE_GAP_MIN = 1.5
 
-# ===== نمادها (با ریشه آپشن) =====
+# ===== نمادها (با دامنه نوسان صحیح) =====
 SYMBOLS = [
     {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db", "option_root": "هرم", "queue_gap": 4.0},
-    {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db", "option_root": "ملت", "queue_gap": 7.0},
-    {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db", "option_root": "ستا", "queue_gap": 7.0},
+    {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db", "option_root": "ملت", "queue_gap": 3.0},
+    {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db", "option_root": "ستا", "queue_gap": 3.0},
 ]
