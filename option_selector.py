@@ -385,7 +385,12 @@ class OptionSelector:
         if option_data.get("spread_pct") is not None:
             print("SPREAD:", f"{round(option_data['spread_pct'], 1)}%")
 
-        print("FAIR VALUE:", option_data["fair_value"])
+        print("FAIR VALUE (اروپایی/بلک-شولز):", option_data["fair_value"])
+        if option_data.get("fair_value_american") is not None:
+            print(
+                "FAIR VALUE (آمریکایی/دوجمله‌ای):", option_data["fair_value_american"],
+                f"| صرف اعمال زودهنگام: {option_data.get('early_exercise_premium')}"
+            )
         print(
             "VOLATILITY:",
             f"{round(option_data.get('volatility_used', 0) * 100, 1)}%",

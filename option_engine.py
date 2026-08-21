@@ -182,6 +182,43 @@ class OptionEngine:
         )
         return None
 
+    def _binomial_price(self, stock_price, strike_price, T, r, sigma, option_type="CALL", steps=80):
+        """قیمت‌گذاری آمریکایی با درخت دوجمله‌ای Cox-Ross-Rubinstein.
+        برخلاف بلک-شولز (که فقط اروپاییه)، امکان اعمال زودهنگام رو در هر
+        گره چک می‌کنه — دقیقاً همون چیزی که برای اپشن‌های بورس ایران لازمه."""
+        S, K = float(stock_price), float(strike_price)
+        if T <= 0:
+            return max(0.0, S - K) if option_type == "CALL" else max(0.0, K - S)
+        if sigma <= 0:
+            sigma = 1e-4
+
+        n = steps
+        dt = T / n
+        u = math.exp(sigma * math.sqrt(dt))
+        d = 1.0 / u
+        growth = math.exp(r * dt)
+        p = (growth - d) / (u - d)
+        p = min(max(p, 0.0), 1.0)
+        disc = math.exp(-r * dt)
+
+        # قیمت سهم در هر گره‌ی انتهایی درخت
+        prices = [S * (u ** j) * (d ** (n - j)) for j in range(n + 1)]
+        if option_type == "CALL":
+            values = [max(0.0, px - K) for px in prices]
+        else:
+            values = [max(0.0, K - px) for px in prices]
+
+        for i in range(n - 1, -1, -1):
+            next_values = values
+            values = []
+            for j in range(i + 1):
+                continuation = disc * (p * next_values[j + 1] + (1 - p) * next_values[j])
+                spot = S * (u ** j) * (d ** (i - j))
+                exercise = max(0.0, spot - K) if option_type == "CALL" else max(0.0, K - spot)
+                values.append(max(continuation, exercise))  # امکان اعمال زودهنگام
+
+        return values[0]
+
     def black_scholes(self, stock_price, strike_price, days_to_expire,
                       volatility=None, risk_free=None, option_type="CALL"):
         if volatility is None:
@@ -308,6 +345,26 @@ class OptionEngine:
         else:
             probability_of_profit = 100.0 if intrinsic > 0 else 0.0
 
+        # اپشن‌های بورس ایران آمریکایی هستن (قابل اعمال زودهنگام)، ولی بلک-شولز
+        # فقط برای اروپایی طراحی شده. این‌جا با درخت دوجمله‌ای، ارزش منصفانه‌ی
+        # آمریکایی رو هم جدا محاسبه می‌کنیم تا فاصله‌ش با بلک-شولز معلوم بشه —
+        # fair_value و valuation اصلی دست‌نخورده می‌مونن که بقیه‌ی کد نشکنه.
+        # از همون نوسانی که fair_value اروپایی رو حساب کرد استفاده می‌کنیم (vol) —
+        # نه IV — وگرنه اختلاف «صرف اعمال زودهنگام» با اختلاف نوسان قاطی می‌شه.
+        try:
+            fair_value_american = self._binomial_price(
+                stock_price, strike_price, T, r, vol, option_type
+            )
+        except Exception:
+            fair_value_american = fair_value
+        early_exercise_premium = round(fair_value_american - fair_value, 2)
+
+        if fair_value > 0 and abs(early_exercise_premium) > fair_value * 0.03:
+            warnings.append(
+                f"EARLY EXERCISE PREMIUM {early_exercise_premium:+.2f} "
+                f"(بلک-شولز اروپایی ممکنه ارزش واقعی رو کم‌تخمین زده باشه)"
+            )
+
         return {
             "stock_price": stock_price, "strike_price": strike_price,
             "option_price": option_price, "days_to_expire": days_to_expire,
@@ -320,6 +377,8 @@ class OptionEngine:
             "fair_value": round(fair_value, 2), "delta": round(delta, 3),
             "gamma": round(greeks["gamma"], 5), "theta": round(greeks["theta"], 3),
             "vega": round(greeks["vega"], 3), "valuation": valuation,
+            "fair_value_american": round(fair_value_american, 2),
+            "early_exercise_premium": early_exercise_premium,
             "data_quality": data_quality, "warnings": warnings,
             "volatility_used": volatility_used, "implied_volatility": implied_volatility,
             "greeks_vol": greeks_vol,

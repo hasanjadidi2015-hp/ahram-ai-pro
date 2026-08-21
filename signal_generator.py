@@ -146,6 +146,10 @@ def generate_signal(stock_action, stock_confidence, stock_score, price,
                      f"سررسید: {option_decision.get('expire_date')} ({option_decision.get('days_to_expire')} روز مانده)")
         lines.append(f"   • قیمت اپشن: {_fmt(option_decision.get('option_price'))} | دلتا: {option_decision.get('delta')}")
         lines.append(f"   • ارزش منصفانه: {_fmt(option_decision.get('fair_value'))} | احتمال سود: {option_decision.get('probability_of_profit')}%")
+        _eep = option_decision.get("early_exercise_premium")
+        _fva = option_decision.get("fair_value_american")
+        if _eep is not None and _fva is not None and abs(_eep) >= 1:
+            lines.append(f"   • ارزش منصفانه (آمریکایی): {_fmt(_fva)}  (صرف اعمال زودهنگام: {_eep:+.2f})")
         if targets:
             option_decision["stop_loss"] = targets["stop_loss"]
             option_decision["target1"] = targets["target1"]
