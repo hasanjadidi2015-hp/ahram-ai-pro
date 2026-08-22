@@ -17,6 +17,14 @@ try:
 except:
     pass
 
+try:
+    import ml_adjust
+    _HAS_ML = True
+except Exception as _e:
+    ml_adjust = None
+    _HAS_ML = False
+    print(f"[WARN] ml_adjust بارگذاری نشد: {_e}")
+
 CONFIG = {
     "version": "4.1",
     "name": "AHRAM AI PRO",
@@ -372,6 +380,17 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     check_score = (passed_checks / total_checks) * 100
     final_score = (score * 0.6) + (check_score * 0.4)
 
+    ml_reason = None
+    if _HAS_ML and option:
+        try:
+            db_path = symbol_config.get("db")
+            ml_adj, ml_reason = ml_adjust.get_ml_adjustment(option, final_score, db_path)
+            if ml_adj:
+                final_score = max(0.0, min(100.0, final_score + ml_adj))
+                reasons.append(f"🧠 {ml_reason}")
+        except Exception as e:
+            state.log(f"  ⚠️ خطا تعدیل ML: {e}", "WARN")
+
     min_checks = 3
 
     if passed_checks >= min_checks and final_score >= CONFIG["min_score"]:
@@ -573,6 +592,60 @@ def log_signal_to_db(signal, symbol_name, db_name):
         state.log(f"  ❌ خطا دیتابیس: {e}", "ERROR")
 
 
+def check_live_exits_for_symbol(name, db):
+    """پوزیشن‌های باز این نماد رو با قیمت لحظه‌ای آپشن مقایسه می‌کنه و اگه به
+    هدف/حد ضرر رسیده باشن، بلافاصله هشدار می‌ده (به‌جای اینکه فقط ساکت توی
+    دیتابیس آپدیت بشه و کاربر تا سیکل بعدی داشبورد متوجه نشه)."""
+    alerts = []
+    try:
+        conn = sqlite3.connect(db)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, option_symbol, option_price, stop_loss, target1, target2, outcome "
+            "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
+            "AND option_symbol IS NOT NULL AND option_symbol != ''"
+        )
+        rows = cur.fetchall()
+        for row_id, sym, entry, sl, t1, t2, outcome in rows:
+            entry_f = float(entry) if entry else 0
+            if entry_f <= 0:
+                continue
+            cur.execute("SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (sym,))
+            pr = cur.fetchone()
+            if not pr or not pr[0]:
+                continue
+            cur_price = float(pr[0])
+            sl_f = float(sl) if sl else None
+            t1_f = float(t1) if t1 else None
+            t2_f = float(t2) if t2 else None
+
+            new_outcome = None
+            if sl_f and cur_price <= sl_f:
+                new_outcome = "LOSS"
+            elif t2_f and cur_price >= t2_f:
+                new_outcome = "WIN"
+            elif t1_f and cur_price >= t1_f and outcome == "PENDING":
+                new_outcome = "T1_HIT"
+
+            if new_outcome and new_outcome != outcome:
+                pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
+                cur.execute("UPDATE signal_history SET outcome=?, outcome_pct=? WHERE id=?",
+                            (new_outcome, pct, row_id))
+                alerts.append((sym, new_outcome, pct, cur_price))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        state.log(f"  ⚠️ خطا بررسی خروج زنده: {e}", "WARN")
+        return
+
+    for sym, new_outcome, pct, cur_price in alerts:
+        label = {"WIN": "🎯 رسیدن به هدف نهایی", "LOSS": "🛑 برخورد به حد ضرر",
+                  "T1_HIT": "✅ رسیدن به هدف اول"}.get(new_outcome, new_outcome)
+        state.log(f"  {label}: {sym} ({pct:+}%)")
+        msg = f"{label}\n\nنماد: {name}\nقرارداد: {sym}\nقیمت فعلی: {cur_price:,.0f}\nسود/زیان: {pct:+}%"
+        send_notification({"type": "EXIT", "message": msg}, name)
+
+
 def analyze_symbol(symbol_config):
     name = symbol_config["name"]
     db = symbol_config["db"]
@@ -586,7 +659,16 @@ def analyze_symbol(symbol_config):
     config.INS_CODE = symbol_config["ins_code"]
     config.OPTION_ROOT = symbol_config.get("option_root", "")
 
+    if _HAS_ML:
+        try:
+            if ml_adjust.needs_daily_update(db):
+                result = ml_adjust.train_model(db)
+                state.log(f"  🧠 آموزش مدل: {result.get('message', result)}")
+        except Exception as e:
+            state.log(f"  ⚠️ خطا آموزش مدل: {e}", "WARN")
+
     market_data = collect_market_data(symbol_config)
+    check_live_exits_for_symbol(name, db)
     technicals = analyze_technicals(symbol_config)
     options_analysis = analyze_options(symbol_config, technicals["action"], technicals["confidence"], technicals["price"])
     signal = generate_multi_layer_signal(symbol_config, technicals, options_analysis, market_data.get("market", {}))
