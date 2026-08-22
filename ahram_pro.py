@@ -9,7 +9,7 @@ import sys
 import sqlite3
 import time
 import json
-from datetime import datetime, time as dtime
+from datetime import datetime, time as dtime, timedelta
 from pathlib import Path
 
 try:
@@ -33,6 +33,7 @@ CONFIG = {
     "min_volume_ratio": 1.0,
     "max_wiv_for_buy": 85,
     "max_positions": 3,
+    "max_position_hold_hours": 3,   # بعد از این مدت، پوزیشن باز-فرض‌شده منقضی می‌شه
     "risk_per_trade": 0.05,
     "capital": 100_000_000,
     "telegram_enabled": True,
@@ -48,6 +49,11 @@ class SystemState:
         self.signals_generated = 0
         self.last_signal_time = None
         self.errors = []
+        # نماد -> {"direction": "BUY_CALL"/"BUY_PUT", "since": datetime}
+        # برای جلوگیری از نوتیفیکیشن تکراری وقتی یه پوزیشن از قبل باز فرض می‌شه،
+        # و برای اعمال واقعی CONFIG["max_positions"] (که قبلاً تعریف بود ولی
+        # هیچ‌جا استفاده نمی‌شد).
+        self.open_positions = {}
 
     def log(self, message, level="INFO"):
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -380,7 +386,7 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
 
     signal = {
         "type": signal_type,
-        "score": round(final_score),
+        "score": max(0, round(final_score)),  # فقط برای نمایش؛ تصمیم BUY/WATCH بالاتر با مقدار خام گرفته شده
         "checks_passed": passed_checks,
         "checks_total": total_checks,
         "reasons": reasons,
@@ -585,13 +591,40 @@ def analyze_symbol(symbol_config):
     options_analysis = analyze_options(symbol_config, technicals["action"], technicals["confidence"], technicals["price"])
     signal = generate_multi_layer_signal(symbol_config, technicals, options_analysis, market_data.get("market", {}))
 
-    # ✅ ذخیره تمام سیگنال‌ها (BUY و WATCH)
+    # ✅ ذخیره تمام سیگنال‌ها (BUY و WATCH) — این رفتار قبلی دست‌نخورده می‌مونه،
+    # چون گزارش روزانه به رکورد هر سیکل (چه BUY چه WATCH) نیاز داره.
     log_signal_to_db(signal, name, db)
-    
+
     if signal["type"] != "WATCH":
-        send_notification(signal, name)
-        state.signals_generated += 1
-        state.last_signal_time = datetime.now()
+        direction = signal["type"]
+        existing = state.open_positions.get(name)
+        max_hold = timedelta(hours=CONFIG.get("max_position_hold_hours", 3))
+        still_open = (
+            existing is not None
+            and existing["direction"] == direction
+            and (datetime.now() - existing["since"]) < max_hold
+        )
+
+        if still_open:
+            state.log(
+                f"  ℹ️ سیگنال {direction} تکراریه (پوزیشن از {existing['since'].strftime('%H:%M')} "
+                f"باز فرض می‌شه) -> نوتیفیکیشن دوباره ارسال نشد", "INFO"
+            )
+        elif name not in state.open_positions and len(state.open_positions) >= CONFIG["max_positions"]:
+            state.log(
+                f"  ⚠️ به سقف {CONFIG['max_positions']} پوزیشن هم‌زمان رسیدیم -> "
+                f"نوتیفیکیشن {direction} برای {name} ارسال نشد", "WARN"
+            )
+        else:
+            state.open_positions[name] = {"direction": direction, "since": datetime.now()}
+            send_notification(signal, name)
+            state.signals_generated += 1
+            state.last_signal_time = datetime.now()
+    else:
+        # برگشتن به WATCH یعنی شرایط فنی/آپشن دیگه پابرجا نیست -> پوزیشن قبلی آزاد می‌شه
+        if name in state.open_positions:
+            state.log(f"  ℹ️ شرایط {name} به WATCH برگشت -> پوزیشن باز قبلی آزاد شد", "INFO")
+            del state.open_positions[name]
 
     print(signal.get("message", f"\n{name}: {signal['type']} (امتیاز: {signal['score']})"))
     print()
