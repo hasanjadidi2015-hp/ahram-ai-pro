@@ -469,16 +469,22 @@ def send_notification(signal, symbol_name):
         try:
             telegram = get_module("telegram")
             if telegram:
-                telegram(f"{title}\n\n{message}")
-                state.log("  ✅ تلگرام ارسال شد")
+                ok = telegram(f"{title}\n\n{message}")
+                if ok:
+                    state.log("  ✅ تلگرام ارسال شد")
+                else:
+                    state.log("  ⚠️ تلگرام ارسال نشد (بدون پاسخ موفق از سرور)", "WARN")
         except Exception as e:
             state.log(f"  ❌ خطا تلگرام: {e}", "ERROR")
     if CONFIG["desktop_enabled"]:
         try:
             desktop = get_module("desktop")
             if desktop:
-                desktop(title, message[:200])
-                state.log("  ✅ دسکتاپ ارسال شد")
+                ok = desktop(title, message[:200])
+                if ok:
+                    state.log("  ✅ دسکتاپ ارسال شد")
+                else:
+                    state.log("  ⚠️ دسکتاپ ارسال نشد", "WARN")
         except Exception as e:
             state.log(f"  ❌ خطا دسکتاپ: {e}", "ERROR")
 
