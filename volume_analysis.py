@@ -201,58 +201,73 @@ class OpenInterestAnalysis:
         self.details = {}
     
     def calculate(self):
-        """محاسبه تغییرات OI"""
+        """محاسبه تغییرات OI -- جدا برای CALL و PUT.
+
+        نکته: موقعیت باز خام فقط می‌گه چند قرارداد بسته نشده؛ نمی‌گه دست
+        کیه یا جهتش چیه. رشد OI پوت لزوماً نزولی نیست (می‌تونه هج باشه) و
+        رشد OI کال لزوماً صعودی نیست. برای همین به‌جای جمع خام CALL+PUT،
+        رشد نسبی هرکدوم رو نسبت به هم می‌سنجیم -- اگه کال بیشتر از پوت رشد
+        کرده باشه، بایاس به سمت صعودیه، و برعکس."""
         try:
             conn = sqlite3.connect(self.db)
             cur = conn.cursor()
-            
-            # آخرین و قبلی
+
             cur.execute("SELECT DISTINCT time FROM options ORDER BY time DESC LIMIT 2")
             times = [r[0] for r in cur.fetchall()]
-            
+
             if len(times) < 2:
                 conn.close()
                 self.signal = "NEUTRAL"
                 return self.signal
-            
-            # OI فعلی و قبلی
-            cur.execute("SELECT SUM(open_interest) FROM options WHERE time = ?", (times[0],))
-            current_oi = cur.fetchone()[0] or 0
-            
-            cur.execute("SELECT SUM(open_interest) FROM options WHERE time = ?", (times[1],))
-            prev_oi = cur.fetchone()[0] or 0
-            
+
+            def _oi_by_type(t):
+                cur.execute(
+                    "SELECT option_type, SUM(open_interest) FROM options WHERE time=? GROUP BY option_type",
+                    (t,),
+                )
+                d = {"CALL": 0.0, "PUT": 0.0}
+                for typ, s in cur.fetchall():
+                    if typ in d:
+                        d[typ] = s or 0.0
+                return d
+
+            cur_oi = _oi_by_type(times[0])
+            prev_oi = _oi_by_type(times[1])
             conn.close()
-            
-            if prev_oi == 0:
+
+            call_change = cur_oi["CALL"] - prev_oi["CALL"]
+            put_change = cur_oi["PUT"] - prev_oi["PUT"]
+            base = abs(prev_oi["CALL"]) + abs(prev_oi["PUT"])
+
+            if base == 0:
                 self.signal = "NEUTRAL"
                 return self.signal
-            
-            change_pct = (current_oi - prev_oi) / prev_oi * 100
-            
-            # تفسیر
-            if change_pct > 10:
-                # OI افزایشی = روند قوی
+
+            # بایاس خالص: کال بیشتر از پوت رشد کرده (مثبت) یا پوت بیشتر از
+            # کال رشد کرده (منفی)
+            bias_pct = ((call_change - put_change) / base) * 100
+
+            if bias_pct > 8:
                 self.signal = "BUY"
                 self.strength = 65.0
-            elif change_pct < -10:
-                # OI کاهشی = تضعیف روند
+            elif bias_pct < -8:
                 self.signal = "SELL"
                 self.strength = 35.0
             else:
                 self.signal = "NEUTRAL"
                 self.strength = 50.0
-            
+
             self.details = {
-                "current_oi": current_oi,
-                "prev_oi": prev_oi,
-                "change_pct": round(change_pct, 2),
+                "call_oi": cur_oi["CALL"], "put_oi": cur_oi["PUT"],
+                "call_oi_change": round(call_change, 1),
+                "put_oi_change": round(put_change, 1),
+                "bias_pct": round(bias_pct, 2),
             }
-            
+
         except Exception:
             self.signal = "NEUTRAL"
             self.strength = 50.0
-        
+
         return self.signal
 
 
