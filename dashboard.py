@@ -95,12 +95,14 @@ def _update_pending_outcomes(cur, conn):
 
 
 def _symbol_info(db):
-    """قیمت سهم + آخرین آپشنی که واقعاً توسط ربات انتخاب/سیگنال شده."""
+    """قیمت سهم + آخرین آپشنی که واقعاً توسط ربات انتخاب/سیگنال شده + گاما
+    اکسپوژر اکتشافی (فقط نمایشی، روی هیچ تصمیمی اثر نداره)."""
     info = {
         "price": "-",
         "opt_sym": "—", "opt_strike": "—", "opt_price": "—",
         "opt_type": None, "opt_days": "—", "opt_vol": 0,
         "opt_time": None,
+        "gamma_wall": None, "gamma_regime": None, "gamma_conf": None,
     }
     conn = _connect(db)
     if not conn:
@@ -154,6 +156,17 @@ def _symbol_info(db):
             pass
 
     conn.close()
+
+    try:
+        from gamma_exposure import analyze_gamma_exposure
+        gx = analyze_gamma_exposure(db)
+        if gx.get("gamma_wall"):
+            info["gamma_wall"] = gx["gamma_wall"]
+            info["gamma_regime"] = gx["regime_bias"]
+            info["gamma_conf"] = gx["confidence"]
+    except Exception:
+        pass
+
     return info
 
 
@@ -272,13 +285,25 @@ def generate():
             opt_block = f"""<div class="optlabel">آخرین آپشن انتخابی</div>
         <div class="optline"><b>{info['opt_sym']}</b> {type_badge} · اعمال {info['opt_strike']}</div>
         <div class="optline">قیمت {info['opt_price']} · {info['opt_days']} روز تا سررسید · حجم {vol_str}</div>"""
+
+        gamma_block = ""
+        if info.get("gamma_wall"):
+            regime_fa = {"CALL_HEAVY": "کال‌سنگین", "PUT_HEAVY": "پوت‌سنگین", "BALANCED": "متعادل"}.get(
+                info["gamma_regime"], info["gamma_regime"]
+            )
+            gamma_block = f"""
+      <div class="optbox">
+        <div class="optlabel">گاما اکسپوژر (اکتشافی)</div>
+        <div class="optline">دیواره {info['gamma_wall']:,.0f} · رژیم {regime_fa} · اطمینان {info['gamma_conf']}</div>
+      </div>"""
+
         card_html += f"""
     <div class="symcard">
       <div class="symname">{name}</div>
       <div class="symprice">{info['price']} <span class="unit">ریال</span></div>
       <div class="optbox">
         {opt_block}
-      </div>
+      </div>{gamma_block}
     </div>"""
 
     pos_html = ""

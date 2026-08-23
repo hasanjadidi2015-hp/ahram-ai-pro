@@ -25,6 +25,14 @@ except Exception as _e:
     _HAS_ML = False
     print(f"[WARN] ml_adjust بارگذاری نشد: {_e}")
 
+try:
+    from gamma_exposure import analyze_gamma_exposure
+    _HAS_GAMMA = True
+except Exception as _e:
+    analyze_gamma_exposure = None
+    _HAS_GAMMA = False
+    print(f"[WARN] gamma_exposure بارگذاری نشد: {_e}")
+
 CONFIG = {
     "version": "4.1",
     "name": "AHRAM AI PRO",
@@ -220,7 +228,8 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
     name = symbol_config["name"]
     db = symbol_config["db"]
     state.log(f"🎯 تحلیل آپشن: {name}")
-    result = {"selected": None, "wiv": None, "fog": None, "tape": None, "volume_analysis": None}
+    result = {"selected": None, "wiv": None, "fog": None, "tape": None,
+               "volume_analysis": None, "gamma_exposure": None}
 
     try:
         OptionSelector = get_module("option_selector")
@@ -235,6 +244,30 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
                 state.log(f"  ⚠️ آپشن مناسب پیدا نشد", "WARN")
     except Exception as e:
         state.log(f"  ❌ خطا انتخاب آپشن: {e}", "ERROR")
+
+    # اکتشافی -- فقط اطلاعاتی؛ روی امتیاز/تصمیم BUY-SELL هیچ اثری نداره.
+    if _HAS_GAMMA:
+        try:
+            gx = analyze_gamma_exposure(db, stock_price=stock_price)
+            result["gamma_exposure"] = gx
+            if gx.get("gamma_wall"):
+                state.log(
+                    f"  ℹ️ گاما (اکتشافی): دیواره {gx['gamma_wall']:,.0f} | "
+                    f"بایاس {gx['regime_bias']} ({gx.get('bias_pct')}%) | "
+                    f"اطمینان {gx['confidence']}"
+                )
+                sel = result.get("selected")
+                if sel and sel.get("strike_price"):
+                    try:
+                        dist = abs(float(sel["strike_price"]) - gx["gamma_wall"]) / gx["gamma_wall"] * 100
+                        if dist < 3 and gx["confidence"] != "LOW":
+                            sel.setdefault("reasons", []).append(
+                                f"⚠️ نزدیک دیواره‌ی گاما ({gx['gamma_wall']:,.0f}) -- احتمال محدودشدن نوسان (اکتشافی)"
+                            )
+                    except Exception:
+                        pass
+        except Exception as e:
+            state.log(f"  ⚠️ خطا گاما اکسپوژر: {e}", "WARN")
 
     try:
         WIVCalculator = get_module("wiv")
