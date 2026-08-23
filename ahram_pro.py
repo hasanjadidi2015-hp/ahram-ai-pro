@@ -165,6 +165,38 @@ def collect_market_data(symbol_config):
     except Exception as e:
         state.log(f"  ❌ خطا قیمت سهم: {e}", "ERROR")
 
+    # اکتشافی -- تازه ساخته شده، هنوز روی داده‌ی زنده تست نشده. اگه فیلدها
+    # اشتباه بود، فقط لاگ می‌کنه و ادامه می‌ده، به بقیه‌ی تحلیل آسیب نمی‌زنه.
+    try:
+        from order_book import collect_order_book
+        ob = collect_order_book(db)
+        data["market"]["order_book"] = ob
+        if ob:
+            state.log(
+                f"  ℹ️ عمق سفارش (اکتشافی): بایاس {ob['pressure']} ({ob['imbalance_pct']}%) | "
+                f"اسپرد {ob['spread_pct']}%"
+            )
+        else:
+            state.log("  ⚠️ عمق سفارش دریافت نشد (فیلدهای TSETMC رو چک کن)", "WARN")
+    except Exception as e:
+        state.log(f"  ⚠️ خطا عمق سفارش: {e}", "WARN")
+
+    # اکتشافی -- تازه ساخته شده. اگه خبر جدید (کدال یا ناظر بازار) پیدا بشه،
+    # بلافاصله هشدار می‌ده -- نه فقط لاگ -- چون این نوع خبر می‌تونه قیمت رو
+    # ناگهانی جابه‌جا کنه.
+    try:
+        from daily_news import check_daily_news
+        news_items = check_daily_news(db)
+        data["market"]["news"] = news_items
+        for it in news_items:
+            state.log(f"  📰 خبر جدید [{it['source']}]: {it['title']}")
+            send_notification(
+                {"type": "NEWS", "message": f"📰 خبر جدید ({name})\n\nمنبع: {it['source']}\n{it['title']}"},
+                name,
+            )
+    except Exception as e:
+        state.log(f"  ⚠️ خطا اخبار روزانه: {e}", "WARN")
+
     try:
         from option_collector import collect_options
         collect_options()
