@@ -436,9 +436,11 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     else:
         signal_type = "WATCH"
 
+    display_score = max(0, round(final_score))  # فقط برای نمایش؛ تصمیم BUY/WATCH بالاتر با مقدار خام گرفته شده
+
     signal = {
         "type": signal_type,
-        "score": max(0, round(final_score)),  # فقط برای نمایش؛ تصمیم BUY/WATCH بالاتر با مقدار خام گرفته شده
+        "score": display_score,
         "checks_passed": passed_checks,
         "checks_total": total_checks,
         "reasons": reasons,
@@ -451,9 +453,9 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         signal["targets"] = targets
         signal["message"] = _format_signal_message(signal, name)
     else:
-        signal["message"] = f"\n{name}: {signal_type} (امتیاز: {round(final_score)})\n"
+        signal["message"] = f"\n{name}: {signal_type} (امتیاز: {display_score})\n"
 
-    state.log(f"  نتیجه: {signal_type} | امتیاز: {round(final_score)} | شرایط: {passed_checks}/{total_checks}")
+    state.log(f"  نتیجه: {signal_type} | امتیاز: {display_score} | شرایط: {passed_checks}/{total_checks}")
 
     return signal
 
@@ -634,12 +636,12 @@ def check_live_exits_for_symbol(name, db):
         conn = sqlite3.connect(db)
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, option_symbol, option_price, stop_loss, target1, target2, outcome "
+            "SELECT option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
             "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-            "AND option_symbol IS NOT NULL AND option_symbol != ''"
+            "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol"
         )
         rows = cur.fetchall()
-        for row_id, sym, entry, sl, t1, t2, outcome in rows:
+        for sym, entry, sl, t1, t2, outcome, _min_id in rows:
             entry_f = float(entry) if entry else 0
             if entry_f <= 0:
                 continue
@@ -662,8 +664,13 @@ def check_live_exits_for_symbol(name, db):
 
             if new_outcome and new_outcome != outcome:
                 pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
-                cur.execute("UPDATE signal_history SET outcome=?, outcome_pct=? WHERE id=?",
-                            (new_outcome, pct, row_id))
+                # همه‌ی ردیف‌های تکراری همین قرارداد با هم بسته می‌شن -- یه
+                # معامله‌ست، نه چندتا -- وگرنه چندین هشدار تکراری فرستاده می‌شه
+                cur.execute(
+                    "UPDATE signal_history SET outcome=?, outcome_pct=? "
+                    "WHERE option_symbol=? AND outcome IN ('PENDING','T1_HIT')",
+                    (new_outcome, pct, sym),
+                )
                 alerts.append((sym, new_outcome, pct, cur_price))
         conn.commit()
         conn.close()

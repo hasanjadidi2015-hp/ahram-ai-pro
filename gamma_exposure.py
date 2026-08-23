@@ -85,7 +85,7 @@ def analyze_gamma_exposure(db_path, stock_price=None, risk_free=None):
 
             sigma = hv
             if opt_price and float(opt_price) > 0:
-                iv = eng._implied_vol(float(opt_price), S, K, T, r, otype)
+                iv = eng._implied_vol(float(opt_price), S, K, T, r, otype, verbose=False)
                 if iv and iv > 0:
                     sigma = iv
 

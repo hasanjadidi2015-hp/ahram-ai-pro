@@ -48,15 +48,21 @@ def _safe(cur, sql, args=()):
 def _update_pending_outcomes(cur, conn):
     """قیمت فعلی هر آپشن باز رو با هدف/حد ضررش مقایسه می‌کنه و outcome رو
     آپدیت می‌کنه. بدون این، ستون outcome همیشه روی PENDING می‌مونه و آمار
-    هوش مصنوعی هیچ‌وقت معنادار نمی‌شه."""
+    هوش مصنوعی هیچ‌وقت معنادار نمی‌شه.
+
+    نکته: چون سیگنال هر سیکل که BUY تکرار بشه دوباره لاگ می‌شه (برای
+    تاریخچه‌ی فعالیت روزانه)، یه قرارداد واحد می‌تونه ده‌ها ردیف PENDING
+    داشته باشه. این‌ها یه معامله‌ن، نه چندتا -- پس با هم (بر پایه‌ی قیمت
+    ورودِ اولین ردیف) به‌عنوان یه گروه بسته می‌شن، وگرنه آمار و داده‌ی
+    آموزشی ML مصنوعاً چند برابر می‌شه."""
     rows = _safe(
         cur,
-        "SELECT id, option_symbol, option_price, stop_loss, target1, target2, outcome "
+        "SELECT option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
         "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-        "AND option_symbol IS NOT NULL AND option_symbol != ''",
+        "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol",
     )
     changed = False
-    for row_id, sym, entry, sl, t1, t2, outcome in rows:
+    for sym, entry, sl, t1, t2, outcome, _min_id in rows:
         try:
             entry_f = float(entry) if entry else 0
             if entry_f <= 0:
@@ -84,8 +90,9 @@ def _update_pending_outcomes(cur, conn):
             if new_outcome and new_outcome != outcome:
                 pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
                 cur.execute(
-                    "UPDATE signal_history SET outcome=?, outcome_pct=? WHERE id=?",
-                    (new_outcome, pct, row_id),
+                    "UPDATE signal_history SET outcome=?, outcome_pct=? "
+                    "WHERE option_symbol=? AND outcome IN ('PENDING','T1_HIT')",
+                    (new_outcome, pct, sym),
                 )
                 changed = True
         except Exception:
@@ -191,7 +198,8 @@ def _all_signals(limit=20):
 def _open_positions():
     """پوزیشن‌های باز از همه‌ی دیتابیس‌ها -- از option_price به‌عنوان قیمت
     ورود استفاده می‌کنه (ستون entry_price اصلاً وجود نداشت، همیشه خالی
-    برمی‌گشت)."""
+    برمی‌گشت). یه ردیف در ازای هر option_symbol (نه هر بار که سیگنال تکرار
+    شده)، وگرنه یه معامله‌ی واحد ده‌ها بار جداگانه لیست می‌شه."""
     out = []
     for _name, db in SYMBOL_DBS:
         conn = _connect(db)
@@ -201,11 +209,11 @@ def _open_positions():
         _update_pending_outcomes(cur, conn)
         rows = _safe(
             cur,
-            "SELECT symbol, option_symbol, option_price, stop_loss, target1, target2, outcome "
+            "SELECT symbol, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
             "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-            "AND option_symbol IS NOT NULL AND option_symbol != '' ORDER BY id DESC",
+            "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol",
         )
-        for stock_name, sym, entry, sl, t1, t2, outcome in rows:
+        for stock_name, sym, entry, sl, t1, t2, outcome, _min_id in rows:
             cur.execute(
                 "SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1",
                 (sym,),
@@ -224,15 +232,19 @@ def _open_positions():
 
 
 def _ai_stats():
+    """برد/باخت/باز رو بر اساس option_symbol یکتا می‌شمره (نه هر ردیف تکراری
+    که هر سیکل برای یه معامله‌ی واحد لاگ می‌شه)، وگرنه آمار مصنوعاً چند
+    برابر نشون داده می‌شه. "کل سیگنال‌ها" (total) استثنا -- اون واقعاً
+    باید هر ردیف فعالیت رو بشمره، چون هدفش گزارش فعالیت روزانه‌ست."""
     wins = losses = pending = total = 0
     for _name, db in SYMBOL_DBS:
         conn = _connect(db)
         if not conn:
             continue
         cur = conn.cursor()
-        w = _safe(cur, "SELECT COUNT(*) FROM signal_history WHERE outcome='WIN'")
-        l = _safe(cur, "SELECT COUNT(*) FROM signal_history WHERE outcome='LOSS'")
-        p = _safe(cur, "SELECT COUNT(*) FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
+        w = _safe(cur, "SELECT COUNT(DISTINCT option_symbol) FROM signal_history WHERE outcome='WIN'")
+        l = _safe(cur, "SELECT COUNT(DISTINCT option_symbol) FROM signal_history WHERE outcome='LOSS'")
+        p = _safe(cur, "SELECT COUNT(DISTINCT option_symbol) FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
                        "AND option_symbol IS NOT NULL AND option_symbol != ''")
         t = _safe(cur, "SELECT COUNT(*) FROM signal_history")
         wins += w[0][0] if w else 0

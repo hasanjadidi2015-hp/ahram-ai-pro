@@ -62,6 +62,8 @@ for name, db in DBS:
 print(f"\n📊 کل سیگنال‌های امروز: {total}")
 
 # پوزیشن‌های باز (برای گزارش آخر روز خیلی مهمه که چی هنوز بازه)
+# نکته: یه ردیف در ازای هر option_symbol یکتا (نه هر بار که سیگنال تکرار
+# شده)، وگرنه یه معامله‌ی واحد ده‌ها بار جداگانه لیست می‌شه.
 print("\n📌 پوزیشن‌های باز در پایان امروز:")
 open_count = 0
 for name, db in DBS:
@@ -69,12 +71,12 @@ for name, db in DBS:
         conn = sqlite3.connect(db)
         cur = conn.cursor()
         cur.execute(
-            "SELECT option_symbol, option_price, stop_loss, target1, target2, outcome "
+            "SELECT option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
             "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-            "AND option_symbol IS NOT NULL AND option_symbol != '' ORDER BY id DESC"
+            "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol"
         )
         rows = cur.fetchall()
-        for sym, entry, sl, t1, t2, outcome in rows:
+        for sym, entry, sl, t1, t2, outcome, _min_id in rows:
             cur.execute("SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (sym,))
             pr = cur.fetchone()
             entry_f = float(entry) if entry else 0
@@ -93,6 +95,7 @@ if open_count == 0:
 print("\n🔍 بررسی سلامت (پیدا کردن مشکل احتمالی):")
 issues_found = 0
 MARKET_CLOSE = "12:30"
+STALE_TOLERANCE_MIN = 12  # کمتر از این فاصله تا پایان بازار طبیعیه (فاصله‌ی سیکل‌ها ۵ دقیقه‌ست)
 for name, _db in DBS:
     if signal_counts.get(name, 0) == 0:
         print(f"  ⚠️ {name}: امروز هیچ سیگنالی ثبت نشده — احتمال قطعی در جمع‌آوری داده یا خطای تحلیل")
@@ -101,9 +104,13 @@ for name, _db in DBS:
         last_t = last_update.get(name)
         if last_t:
             last_hm = last_t.split(" ")[1][:5] if " " in last_t else None
-            if last_hm and last_hm < MARKET_CLOSE:
-                print(f"  ⚠️ {name}: آخرین سیگنال ساعت {last_hm} ثبت شده (قبل از پایان بازار {MARKET_CLOSE}) — احتمال توقف زودهنگام ربات")
-                issues_found += 1
+            if last_hm:
+                mc_h, mc_m = map(int, MARKET_CLOSE.split(":"))
+                lh, lm = map(int, last_hm.split(":"))
+                gap_min = (mc_h * 60 + mc_m) - (lh * 60 + lm)
+                if gap_min > STALE_TOLERANCE_MIN:
+                    print(f"  ⚠️ {name}: آخرین سیگنال ساعت {last_hm} ثبت شده ({gap_min} دقیقه قبل از پایان بازار {MARKET_CLOSE}) — احتمال توقف زودهنگام ربات")
+                    issues_found += 1
 if issues_found == 0:
     print("  ✅ چیز مشکوکی پیدا نشد.")
 
