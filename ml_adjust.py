@@ -49,7 +49,7 @@ def train_model(db_path):
             "SELECT details, composite_score, outcome FROM signal_history "
             "WHERE outcome IN ('WIN','LOSS') AND details IS NOT NULL AND details != '' "
             "AND id IN (SELECT MIN(id) FROM signal_history WHERE outcome IN ('WIN','LOSS') "
-            "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol)"
+            "AND position_id IS NOT NULL GROUP BY position_id)"
         )
         rows = cur.fetchall()
         conn.close()

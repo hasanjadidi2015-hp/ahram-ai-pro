@@ -57,12 +57,12 @@ def _update_pending_outcomes(cur, conn):
     آموزشی ML مصنوعاً چند برابر می‌شه."""
     rows = _safe(
         cur,
-        "SELECT option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
+        "SELECT position_id, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
         "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-        "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol",
+        "AND position_id IS NOT NULL GROUP BY position_id",
     )
     changed = False
-    for sym, entry, sl, t1, t2, outcome, _min_id in rows:
+    for pos_id, sym, entry, sl, t1, t2, outcome, _min_id in rows:
         try:
             entry_f = float(entry) if entry else 0
             if entry_f <= 0:
@@ -91,8 +91,8 @@ def _update_pending_outcomes(cur, conn):
                 pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
                 cur.execute(
                     "UPDATE signal_history SET outcome=?, outcome_pct=? "
-                    "WHERE option_symbol=? AND outcome IN ('PENDING','T1_HIT')",
-                    (new_outcome, pct, sym),
+                    "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
+                    (new_outcome, pct, pos_id),
                 )
                 changed = True
         except Exception:
@@ -211,7 +211,7 @@ def _open_positions():
             cur,
             "SELECT symbol, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
             "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-            "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol",
+            "AND position_id IS NOT NULL GROUP BY position_id",
         )
         for stock_name, sym, entry, sl, t1, t2, outcome, _min_id in rows:
             cur.execute(
@@ -242,10 +242,10 @@ def _ai_stats():
         if not conn:
             continue
         cur = conn.cursor()
-        w = _safe(cur, "SELECT COUNT(DISTINCT option_symbol) FROM signal_history WHERE outcome='WIN'")
-        l = _safe(cur, "SELECT COUNT(DISTINCT option_symbol) FROM signal_history WHERE outcome='LOSS'")
-        p = _safe(cur, "SELECT COUNT(DISTINCT option_symbol) FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-                       "AND option_symbol IS NOT NULL AND option_symbol != ''")
+        w = _safe(cur, "SELECT COUNT(DISTINCT position_id) FROM signal_history WHERE outcome='WIN'")
+        l = _safe(cur, "SELECT COUNT(DISTINCT position_id) FROM signal_history WHERE outcome='LOSS'")
+        p = _safe(cur, "SELECT COUNT(DISTINCT position_id) FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
+                       "AND position_id IS NOT NULL")
         t = _safe(cur, "SELECT COUNT(*) FROM signal_history")
         wins += w[0][0] if w else 0
         losses += l[0][0] if l else 0

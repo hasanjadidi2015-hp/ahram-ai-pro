@@ -33,6 +33,15 @@ except Exception as _e:
     _HAS_GAMMA = False
     print(f"[WARN] gamma_exposure بارگذاری نشد: {_e}")
 
+try:
+    from iv_rank import record_daily_iv, compute_iv_rank_percentile, MIN_DAYS as _IV_MIN_DAYS
+    _HAS_IVRANK = True
+except Exception as _e:
+    record_daily_iv = compute_iv_rank_percentile = None
+    _IV_MIN_DAYS = 10
+    _HAS_IVRANK = False
+    print(f"[WARN] iv_rank بارگذاری نشد: {_e}")
+
 CONFIG = {
     "version": "4.1",
     "name": "AHRAM AI PRO",
@@ -229,7 +238,7 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
     db = symbol_config["db"]
     state.log(f"🎯 تحلیل آپشن: {name}")
     result = {"selected": None, "wiv": None, "fog": None, "tape": None,
-               "volume_analysis": None, "gamma_exposure": None}
+               "volume_analysis": None, "gamma_exposure": None, "iv_rank": None}
 
     try:
         OptionSelector = get_module("option_selector")
@@ -268,6 +277,35 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
                         pass
         except Exception as e:
             state.log(f"  ⚠️ خطا گاما اکسپوژر: {e}", "WARN")
+
+    # اکتشافی -- IV امروز نسبت به تاریخچه‌ی خودش (نه نسبت به HV مثل fog_meter).
+    # روی امتیاز/تصمیم اثر نمی‌ذاره تا وقتی حداقل چند هفته داده جمع بشه.
+    if _HAS_IVRANK:
+        try:
+            sel = result.get("selected")
+            cur_iv = sel.get("implied_volatility") if sel else None
+            if cur_iv:
+                record_daily_iv(db, cur_iv)
+            ivr = compute_iv_rank_percentile(db, current_iv=cur_iv)
+            result["iv_rank"] = ivr
+            if ivr["ready"]:
+                state.log(
+                    f"  ℹ️ IV Rank (اکتشافی): {ivr['iv_rank']}% | "
+                    f"IV Percentile: {ivr['iv_percentile']}% | بر پایه‌ی {ivr['days']} روز"
+                )
+                if sel and ivr["iv_rank"] is not None:
+                    if ivr["iv_rank"] >= 80:
+                        sel.setdefault("reasons", []).append(
+                            f"⚠️ IV Rank بالا ({ivr['iv_rank']}%) -- پرمیوم نسبت به تاریخچه‌ی خودش گرونه (اکتشافی)"
+                        )
+                    elif ivr["iv_rank"] <= 20:
+                        sel.setdefault("reasons", []).append(
+                            f"ℹ️ IV Rank پایین ({ivr['iv_rank']}%) -- پرمیوم نسبت به تاریخچه‌ی خودش ارزونه (اکتشافی)"
+                        )
+            else:
+                state.log(f"  ℹ️ IV Rank: داده کافی نیست ({ivr['days']}/{_IV_MIN_DAYS} روز)")
+        except Exception as e:
+            state.log(f"  ⚠️ خطا IV Rank: {e}", "WARN")
 
     try:
         WIVCalculator = get_module("wiv")
@@ -587,6 +625,7 @@ def log_signal_to_db(signal, symbol_name, db_name):
             "composite_score": "REAL",
             "signal_type": "TEXT",
             "details": "TEXT",
+            "position_id": "TEXT",
         }
         
         for col_name, col_type in required_columns.items():
@@ -597,27 +636,51 @@ def log_signal_to_db(signal, symbol_name, db_name):
                     state.log(f"⚠️ ستون {col_name} اضافه نشد: {_e}", "WARN")
         
         conn.commit()
-        
+
         option = signal.get("option", {})
         targets = signal.get("targets", {})
-        
+        opt_sym = option.get("symbol") if option else None
+        direction = signal["type"]
+
+        # position_id: یه پوزیشن واقعی -- تا وقتی برای همین
+        # (نماد پایه + قرارداد + جهت) یه ردیف PENDING/T1_HIT باز هست، همون
+        # position_id قبلی استفاده می‌شه (یعنی هر بار سیگنال تکرار بشه، به
+        # همون معامله وصل می‌مونه، حتی اگه چند روز طول بکشه). به محض اینکه
+        # اون پوزیشن WIN/LOSS بشه، اگه همون قرارداد دوباره سیگنال بگیره، یه
+        # position_id کاملاً جدید و مستقل می‌گیره.
+        position_id = None
+        if opt_sym and direction in ("BUY_CALL", "BUY_PUT", "BUY", "STRONG BUY"):
+            cur.execute(
+                "SELECT position_id FROM signal_history WHERE symbol=? AND option_symbol=? "
+                "AND signal_type=? AND outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL "
+                "ORDER BY id DESC LIMIT 1",
+                (symbol_name, opt_sym, direction),
+            )
+            r = cur.fetchone()
+            if r and r[0]:
+                position_id = r[0]
+            else:
+                slug = symbol_name.replace(" ", "")
+                position_id = f"{slug}-{opt_sym}-{direction}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
         cur.execute("""
             INSERT INTO signal_history 
             (time, symbol, signal_type, composite_score, option_symbol, 
-             option_price, strike_price, stop_loss, target1, target2, details)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             option_price, strike_price, stop_loss, target1, target2, details, position_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             symbol_name,
             signal["type"],
             signal["score"],
-            option.get("symbol") if option else None,
+            opt_sym,
             option.get("option_price") if option else None,
             option.get("strike_price") if option else None,
             targets.get("stop_loss") if targets else None,
             targets.get("target1") if targets else None,
             targets.get("target2") if targets else None,
-            json.dumps(signal, ensure_ascii=False, default=str)
+            json.dumps(signal, ensure_ascii=False, default=str),
+            position_id,
         ))
         
         conn.commit()
@@ -636,12 +699,12 @@ def check_live_exits_for_symbol(name, db):
         conn = sqlite3.connect(db)
         cur = conn.cursor()
         cur.execute(
-            "SELECT option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
+            "SELECT position_id, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
             "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-            "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol"
+            "AND position_id IS NOT NULL GROUP BY position_id"
         )
         rows = cur.fetchall()
-        for sym, entry, sl, t1, t2, outcome, _min_id in rows:
+        for pos_id, sym, entry, sl, t1, t2, outcome, _min_id in rows:
             entry_f = float(entry) if entry else 0
             if entry_f <= 0:
                 continue
@@ -664,12 +727,12 @@ def check_live_exits_for_symbol(name, db):
 
             if new_outcome and new_outcome != outcome:
                 pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
-                # همه‌ی ردیف‌های تکراری همین قرارداد با هم بسته می‌شن -- یه
+                # همه‌ی ردیف‌های همین position_id با هم بسته می‌شن -- یه
                 # معامله‌ست، نه چندتا -- وگرنه چندین هشدار تکراری فرستاده می‌شه
                 cur.execute(
                     "UPDATE signal_history SET outcome=?, outcome_pct=? "
-                    "WHERE option_symbol=? AND outcome IN ('PENDING','T1_HIT')",
-                    (new_outcome, pct, sym),
+                    "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
+                    (new_outcome, pct, pos_id),
                 )
                 alerts.append((sym, new_outcome, pct, cur_price))
         conn.commit()

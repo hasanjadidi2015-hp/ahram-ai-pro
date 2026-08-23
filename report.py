@@ -73,7 +73,7 @@ for name, db in DBS:
         cur.execute(
             "SELECT option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
             "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-            "AND option_symbol IS NOT NULL AND option_symbol != '' GROUP BY option_symbol"
+            "AND position_id IS NOT NULL GROUP BY position_id"
         )
         rows = cur.fetchall()
         for sym, entry, sl, t1, t2, outcome, _min_id in rows:
