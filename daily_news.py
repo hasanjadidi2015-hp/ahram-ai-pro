@@ -1,24 +1,28 @@
 # -*- coding: utf-8 -*-
 """
 اخبار رسمی روزانه:
-- اطلاعیه‌های کدال مرتبط با نماد از مسیر TSETMC
-- پیام‌های ناظر بازار مرتبط با نماد
+- اطلاعیه‌های کدال از TSETMC
+- پیام‌های ناظر بازار از TSETMC
 
-نکته مهم:
-در اولین اجرا، خبرهای قبلی فقط به‌عنوان Baseline در دیتابیس ذخیره می‌شوند
-و هیچ نوتیفیکیشنی ارسال نمی‌شود. از اجرای بعد، فقط موارد واقعاً جدید
-برگردانده می‌شوند تا ربات برای خبرهای قدیمی هشدار نفرستد.
+قوانین ایمنی:
+1) خبرهای قدیمی ذخیره می‌شوند، اما اعلان نمی‌گیرند.
+2) فقط خبرهای حداکثر دو روز اخیر مجاز به اعلان هستند.
+3) خبر بدون تاریخ معتبر فقط ذخیره می‌شود و اعلان ندارد.
+4) در هر سیکل حداکثر دو اعلان خبری برگردانده می‌شود.
 """
 
 import json
 import sqlite3
 import time
-from datetime import datetime
+from datetime import datetime, date
 
 import requests
 
 import config
 
+
+MAX_NEWS_AGE_DAYS = 1
+MAX_ALERTS_PER_CYCLE = 2
 
 HEADERS = {
     "User-Agent": (
@@ -32,7 +36,6 @@ HEADERS = {
 
 
 def _get_json(url, max_retries=2):
-    """دریافت امن JSON از TSETMC."""
     for attempt in range(1, max_retries + 1):
         try:
             response = requests.get(
@@ -61,14 +64,13 @@ def _get_json(url, max_retries=2):
         try:
             return response.json()
         except ValueError:
-            print(f"[NEWS] INVALID JSON: {response.text[:300]}")
+            print("[NEWS] INVALID JSON:", response.text[:300])
             return None
 
     return None
 
 
 def fetch_codal_notifications(ins_code=None, top=10):
-    """دریافت اطلاعیه‌های کدال مرتبط با نماد از API TSETMC."""
     ins_code = ins_code or config.INS_CODE
 
     url = (
@@ -100,7 +102,6 @@ def fetch_codal_notifications(ins_code=None, top=10):
 
 
 def fetch_supervisor_messages(ins_code=None):
-    """دریافت پیام‌های ناظر بازار مرتبط با نماد."""
     ins_code = ins_code or config.INS_CODE
 
     url = (
@@ -132,8 +133,6 @@ def fetch_supervisor_messages(ins_code=None):
 
 
 def _ensure_table(cur):
-    """ساخت/ارتقای جدول خبرها و تنظیمات اولیه."""
-
     cur.execute("""
         CREATE TABLE IF NOT EXISTS daily_news (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,6 +141,7 @@ def _ensure_table(cur):
             item_id TEXT,
             title TEXT,
             raw TEXT,
+            event_date TEXT,
             price_at_news REAL,
             outcome_pct_1d REAL,
             outcome_pct_5d REAL,
@@ -151,11 +151,11 @@ def _ensure_table(cur):
         )
     """)
 
-    # سازگاری با دیتابیس‌های قبلی
     cur.execute("PRAGMA table_info(daily_news)")
     existing_columns = {row[1] for row in cur.fetchall()}
 
     needed_columns = [
+        ("event_date", "TEXT"),
         ("price_at_news", "REAL"),
         ("outcome_pct_1d", "REAL"),
         ("outcome_pct_5d", "REAL"),
@@ -172,15 +172,13 @@ def _ensure_table(cur):
                     f"ADD COLUMN {column_name} {column_type}"
                 )
             except Exception as e:
-                print(f"[NEWS] COLUMN MIGRATION ERROR ({column_name}): {e}")
+                print(f"[NEWS] COLUMN MIGRATION ERROR {column_name}: {e}")
 
-    # جلوگیری از ذخیره رکورد تکراری
     cur.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_news_unique
         ON daily_news(source, item_id)
     """)
 
-    # تنظیمات اختصاصی هر دیتابیس نماد
     cur.execute("""
         CREATE TABLE IF NOT EXISTS news_settings (
             setting_key TEXT PRIMARY KEY,
@@ -195,6 +193,7 @@ def _setting_get(cur, key, default=None):
         "SELECT setting_value FROM news_settings WHERE setting_key=?",
         (key,),
     )
+
     row = cur.fetchone()
     return row[0] if row else default
 
@@ -213,7 +212,6 @@ def _setting_set(cur, key, value):
 
 
 def _current_stock_price(cur):
-    """آخرین قیمت ذخیره‌شده دارایی پایه."""
     cur.execute("""
         SELECT last_price
         FROM prices
@@ -232,11 +230,6 @@ def _current_stock_price(cur):
 
 
 def _extract_title(item):
-    """
-    استخراج عنوان از پاسخ‌های متفاوت TSETMC.
-
-    برای پیام ناظر واقعی، tseTitle مهم‌ترین فیلد است.
-    """
     if not isinstance(item, dict):
         return str(item)[:300]
 
@@ -254,24 +247,16 @@ def _extract_title(item):
         if value:
             return str(value).strip()
 
-    description = (
-        item.get("tseDesc")
-        or item.get("description")
-        or item.get("desc")
-    )
+    for key in ("tseDesc", "description", "desc"):
+        value = item.get(key)
 
-    if description:
-        return str(description).strip()[:300]
+        if value:
+            return str(value).strip()[:300]
 
     return str(item)[:300]
 
 
 def _extract_id(item):
-    """
-    استخراج شناسه یکتای رسمی خبر.
-
-    برای پیام ناظر TSETMC، tseMsgIdn فیلد واقعی شناسه است.
-    """
     if not isinstance(item, dict):
         return None
 
@@ -294,6 +279,79 @@ def _extract_id(item):
     return None
 
 
+def _extract_event_date(item):
+    """
+    تاریخ خبر را برمی‌گرداند.
+
+    مهم‌ترین فیلد TSETMC برای پیام ناظر:
+      dEven = 20260824
+
+    خروجی:
+      YYYY-MM-DD
+    یا:
+      None
+    """
+    if not isinstance(item, dict):
+        return None
+
+    possible_fields = (
+        "dEven",
+        "date",
+        "publishDate",
+        "publish_date",
+        "dateTime",
+        "sendDate",
+    )
+
+    for key in possible_fields:
+        value = item.get(key)
+
+        if value is None:
+            continue
+
+        digits = "".join(char for char in str(value) if char.isdigit())
+
+        # فرمت رایج TSETMC: YYYYMMDD
+        if len(digits) >= 8:
+            digits = digits[:8]
+
+            try:
+                parsed = datetime.strptime(
+                    digits,
+                    "%Y%m%d",
+                ).date()
+
+                return parsed.isoformat()
+
+            except ValueError:
+                continue
+
+    return None
+
+
+def _is_recent_event(event_date_text):
+    """
+    فقط خبرهای امروز، دیروز و حداکثر دو روز اخیر اجازه اعلان دارند.
+
+    خبر بدون تاریخ معتبر:
+    ذخیره می‌شود، اما اعلان ندارد.
+    """
+    if not event_date_text:
+        return False
+
+    try:
+        event_day = datetime.strptime(
+            event_date_text,
+            "%Y-%m-%d",
+        ).date()
+    except ValueError:
+        return False
+
+    age_days = (date.today() - event_day).days
+
+    return 0 <= age_days <= MAX_NEWS_AGE_DAYS
+
+
 _CATEGORIES = [
     ("توقف", "توقف نماد"),
     ("بازگشایی", "بازگشایی نماد"),
@@ -303,7 +361,6 @@ _CATEGORIES = [
     ("تسويه", "تسویه اختیار معامله"),
     ("افزایش سرمایه", "افزایش سرمایه"),
     ("افزايش سرمايه", "افزایش سرمایه"),
-    ("کاهش سرمایه", "کاهش سرمایه"),
     ("مجمع", "مجمع"),
     ("افشای اطلاعات", "افشای اطلاعات بااهمیت"),
     ("افشاي اطلاعات", "افشای اطلاعات بااهمیت"),
@@ -311,15 +368,14 @@ _CATEGORIES = [
     ("گزارش فعاليت", "گزارش فعالیت"),
     ("صورت مالی", "صورت‌های مالی"),
     ("صورت مالي", "صورت‌های مالی"),
-    ("قرارداد اختیار", "اطلاعیه اختیار معامله"),
     ("قرارداد اختيار", "اطلاعیه اختیار معامله"),
-    ("آغاز دوره معاملاتی", "شروع معامله اختیار"),
+    ("قرارداد اختیار", "اطلاعیه اختیار معامله"),
     ("آغاز دوره معاملاتي", "شروع معامله اختیار"),
+    ("آغاز دوره معاملاتی", "شروع معامله اختیار"),
 ]
 
 
 def _categorize(title):
-    """دسته‌بندی ساده و قابل‌فهم خبر بر پایه عنوان."""
     normalized_title = (title or "").strip().lower()
 
     for keyword, category in _CATEGORIES:
@@ -330,7 +386,6 @@ def _categorize(title):
 
 
 def _serialize_raw(item):
-    """ذخیره امن پاسخ خام برای بررسی و دیباگ بعدی."""
     try:
         return json.dumps(
             item,
@@ -341,22 +396,12 @@ def _serialize_raw(item):
         return str(item)[:4000]
 
 
-def _save_item(
-    cur,
-    source,
-    item,
-    news_price,
-):
-    """
-    ذخیره یک آیتم در دیتابیس.
-
-    خروجی:
-      (is_new, result_dictionary)
-    """
+def _save_item(cur, source, item, news_price):
+    """آیتم را ذخیره می‌کند و اطلاعات آن را برمی‌گرداند."""
     title = _extract_title(item)
     item_id = _extract_id(item)
+    event_date = _extract_event_date(item)
 
-    # اگر API شناسه رسمی نداشت، یک کلید fallback می‌سازیم
     if not item_id:
         item_id = f"title:{title[:250]}"
 
@@ -378,44 +423,37 @@ def _save_item(
             item_id,
             title,
             raw,
+            event_date,
             price_at_news,
             category
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         now,
         source,
         item_id,
         title,
         _serialize_raw(item),
+        event_date,
         news_price,
         category,
     ))
 
-    return True, {
+    result = {
         "source": "کدال" if source == "codal" else "ناظر بازار",
         "title": title,
         "category": category,
         "item_id": item_id,
+        "event_date": event_date,
         "time": now,
     }
 
+    return True, result
 
-def check_daily_news(
-    db_path=None,
-    ins_code=None,
-    top=10,
-):
+
+def check_daily_news(db_path=None, ins_code=None, top=10):
     """
-    بررسی خبرهای رسمی و پیام‌های ناظر.
-
-    رفتار اجرای اول:
-      - اطلاعات قبلی فقط ذخیره می‌شوند.
-      - هیچ موردی به‌عنوان خبر تازه برگردانده نمی‌شود.
-      - بنابراین هیچ نوتیفیکیشن تاریخی ارسال نخواهد شد.
-
-    رفتار اجرای بعدی:
-      - فقط مواردی که قبلاً در دیتابیس نبوده‌اند برگردانده می‌شوند.
+    خبرها را ذخیره می‌کند؛ فقط موارد جدید و تازه را برای اعلان برمی‌گرداند.
     """
     db_path = db_path or config.DATABASE_NAME
     ins_code = ins_code or config.INS_CODE
@@ -428,11 +466,13 @@ def check_daily_news(
         print("[NEWS] DATABASE INIT ERROR:", e)
         return []
 
-    first_sync_done = _setting_get(
-        cur,
-        "daily_news_initial_sync_done",
-        "0",
-    ) == "1"
+    initial_sync_done = (
+        _setting_get(
+            cur,
+            "daily_news_initial_sync_done",
+            "0",
+        ) == "1"
+    )
 
     news_price = _current_stock_price(cur)
 
@@ -469,8 +509,8 @@ def check_daily_news(
         if is_new and result:
             inserted_items.append(result)
 
-    # اولین همگام‌سازی: ذخیره اطلاعات قدیمی، بدون هشدار
-    if not first_sync_done:
+    # اولین اجرا: همه‌چیز ذخیره شود، اما هشدار نده
+    if not initial_sync_done:
         _setting_set(
             cur,
             "daily_news_initial_sync_done",
@@ -482,7 +522,7 @@ def check_daily_news(
 
         print(
             "[NEWS] INITIAL BASELINE COMPLETED: "
-            f"{len(inserted_items)} مورد قدیمی ذخیره شد؛ "
+            f"{len(inserted_items)} مورد ذخیره شد؛ "
             "هیچ نوتیفیکیشنی ارسال نمی‌شود."
         )
 
@@ -491,20 +531,42 @@ def check_daily_news(
     conn.commit()
     conn.close()
 
-    return inserted_items
+    # فقط خبرهای تازه به چرخه اصلی برگردند.
+    alertable_items = [
+        item for item in inserted_items
+        if _is_recent_event(item.get("event_date"))
+    ]
+
+    # سقف اعلان برای جلوگیری از کندشدن ربات
+    if len(alertable_items) > MAX_ALERTS_PER_CYCLE:
+        print(
+            f"[NEWS] {len(alertable_items)} خبر تازه پیدا شد؛ "
+            f"فقط {MAX_ALERTS_PER_CYCLE} مورد اول اعلان می‌گیرند."
+        )
+
+    old_count = len(inserted_items) - len(alertable_items)
+
+    if old_count > 0:
+        print(
+            f"[NEWS] {old_count} مورد قدیمی/بدون تاریخ فقط ذخیره شد؛ "
+            "اعلان ندارد."
+        )
+
+    return alertable_items[:MAX_ALERTS_PER_CYCLE]
 
 
 if __name__ == "__main__":
     items = check_daily_news()
 
     if items:
-        print(f"{len(items)} خبر جدید:")
+        print(f"{len(items)} خبر تازه و قابل‌اعلان:")
 
         for item in items:
             print(
                 f"  [{item['source']} | "
+                f"{item['event_date']} | "
                 f"{item['category']}] "
                 f"{item['title']}"
             )
     else:
-        print("خبر جدیدی نیست یا همگام‌سازی اولیه انجام شد.")
+        print("خبر تازه و قابل‌اعلان وجود ندارد.")

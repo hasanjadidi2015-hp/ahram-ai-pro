@@ -61,7 +61,7 @@ CONFIG = {
     "max_position_hold_hours": 3,   # بعد از این مدت، پوزیشن باز-فرض‌شده منقضی می‌شه
     "risk_per_trade": 0.05,
     "capital": 100_000_000,
-    "telegram_enabled": True,
+    "telegram_enabled": False,
     "desktop_enabled": True,
     "dashboard_enabled": True,
 }
