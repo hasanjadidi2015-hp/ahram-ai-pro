@@ -189,11 +189,14 @@ def collect_market_data(symbol_config):
         news_items = check_daily_news(db)
         data["market"]["news"] = news_items
         for it in news_items:
-            state.log(f"  📰 خبر جدید [{it['source']}]: {it['title']}")
+            cat = it.get("category", "")
+            state.log(f"  📰 خبر جدید [{it['source']}/{cat}]: {it['title']}")
             send_notification(
-                {"type": "NEWS", "message": f"📰 خبر جدید ({name})\n\nمنبع: {it['source']}\n{it['title']}"},
+                {"type": "NEWS", "message": f"📰 خبر جدید ({name})\n\nمنبع: {it['source']} | دسته: {cat}\n{it['title']}"},
                 name,
             )
+        from news_impact import update_news_impact
+        update_news_impact(db)
     except Exception as e:
         state.log(f"  ⚠️ خطا اخبار روزانه: {e}", "WARN")
 

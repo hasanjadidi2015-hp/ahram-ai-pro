@@ -93,9 +93,35 @@ def _ensure_table(cur):
             source TEXT,
             item_id TEXT,
             title TEXT,
-            raw TEXT
+            raw TEXT,
+            price_at_news REAL,
+            outcome_pct_1d REAL,
+            outcome_pct_5d REAL,
+            outcome_pct_20d REAL,
+            fully_evaluated INTEGER DEFAULT 0,
+            category TEXT
         )
     """)
+    # خودترمیم برای دیتابیس‌هایی که این جدول رو از نسخه‌ی قبلی (بدون این
+    # ستون‌ها) دارن
+    cur.execute("PRAGMA table_info(daily_news)")
+    existing = {r[1] for r in cur.fetchall()}
+    for col, coltype in [
+        ("price_at_news", "REAL"), ("outcome_pct_1d", "REAL"),
+        ("outcome_pct_5d", "REAL"), ("outcome_pct_20d", "REAL"),
+        ("fully_evaluated", "INTEGER DEFAULT 0"), ("category", "TEXT"),
+    ]:
+        if col not in existing:
+            try:
+                cur.execute(f"ALTER TABLE daily_news ADD COLUMN {col} {coltype}")
+            except Exception:
+                pass
+
+
+def _current_stock_price(cur):
+    cur.execute("SELECT last_price FROM prices WHERE last_price IS NOT NULL AND last_price>0 ORDER BY id DESC LIMIT 1")
+    r = cur.fetchone()
+    return float(r[0]) if r and r[0] else None
 
 
 def _extract_title(item):
@@ -103,6 +129,31 @@ def _extract_title(item):
         if item.get(key):
             return str(item[key])
     return str(item)[:200]
+
+
+# دسته‌بندی سبک بر اساس کلیدواژه‌ی عنوان -- چون تأثیر «افزایش سرمایه» و
+# «گزارش فعالیت ماهانه» روی قیمت کاملاً متفاوته و اگه با هم قاطی بشن،
+# میانگین تأثیر بی‌معنی می‌شه.
+_CODAL_CATEGORIES = [
+    ("افزایش سرمایه", "افزایش سرمایه"),
+    ("کاهش سرمایه", "کاهش سرمایه"),
+    ("مجمع", "مجمع"),
+    ("پیش بینی سود", "پیش‌بینی سود"),
+    ("پیش‌بینی سود", "پیش‌بینی سود"),
+    ("صورت", "صورت‌های مالی"),
+    ("فعالیت ماه", "گزارش فعالیت ماهانه"),
+    ("قرارداد", "قرارداد/رویداد مهم"),
+    ("توقف", "توقف نماد"),
+    ("بازگشایی", "بازگشایی نماد"),
+    ("افشای اطلاعات", "افشای اطلاعات بااهمیت"),
+]
+
+
+def _categorize(title):
+    for keyword, label in _CODAL_CATEGORIES:
+        if keyword in title:
+            return label
+    return "سایر"
 
 
 def _extract_id(item):
@@ -122,6 +173,7 @@ def check_daily_news(db_path=None, ins_code=None):
     _ensure_table(cur)
 
     new_items = []
+    news_price = _current_stock_price(cur)
 
     codal_items = fetch_codal_notifications(ins_code)
     for item in codal_items:
@@ -130,12 +182,13 @@ def check_daily_news(db_path=None, ins_code=None):
         if cur.fetchone():
             continue
         title = _extract_title(item)
+        category = _categorize(title)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cur.execute(
-            "INSERT INTO daily_news(time, source, item_id, title, raw) VALUES (?,?,?,?,?)",
-            (now, "codal", item_id, title, str(item)[:1000]),
+            "INSERT INTO daily_news(time, source, item_id, title, raw, price_at_news, category) VALUES (?,?,?,?,?,?,?)",
+            (now, "codal", item_id, title, str(item)[:1000], news_price, category),
         )
-        new_items.append({"source": "کدال", "title": title})
+        new_items.append({"source": "کدال", "title": title, "category": category})
 
     msg_items = fetch_supervisor_messages(ins_code)
     for item in msg_items:
@@ -144,12 +197,13 @@ def check_daily_news(db_path=None, ins_code=None):
         if cur.fetchone():
             continue
         title = _extract_title(item)
+        category = _categorize(title)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cur.execute(
-            "INSERT INTO daily_news(time, source, item_id, title, raw) VALUES (?,?,?,?,?)",
-            (now, "supervisor", item_id, title, str(item)[:1000]),
+            "INSERT INTO daily_news(time, source, item_id, title, raw, price_at_news, category) VALUES (?,?,?,?,?,?,?)",
+            (now, "supervisor", item_id, title, str(item)[:1000], news_price, category),
         )
-        new_items.append({"source": "ناظر بازار", "title": title})
+        new_items.append({"source": "ناظر بازار", "title": title, "category": category})
 
     conn.commit()
     conn.close()

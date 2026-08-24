@@ -114,6 +114,29 @@ for name, _db in DBS:
 if issues_found == 0:
     print("  ✅ چیز مشکوکی پیدا نشد.")
 
+# تأثیر خبرها روی قیمت (کدال + ناظر بازار) -- برای تصمیم‌گیری آینده که
+# آیا به‌عنوان سیگنال کمکی ازشون استفاده کنیم یا نه
+print("\n📰 تأثیر خبرها روی قیمت (در حال جمع‌آوری):")
+try:
+    from news_impact import update_news_impact, news_impact_summary, MIN_SAMPLES as _NEWS_MIN
+    any_summary = False
+    for name, db in DBS:
+        try:
+            update_news_impact(db)
+            summary = news_impact_summary(db)
+            for (source, category), s in summary.items():
+                any_summary = True
+                label = {"codal": "کدال", "supervisor": "ناظر بازار"}.get(source, source)
+                ready_txt = "✅ آماده برای تصمیم" if s["ready"] else f"⏳ {s['samples']}/{_NEWS_MIN} نمونه"
+                print(f"  {name} | {label}/{category} | {ready_txt} | تأثیر ۱روزه:{s['avg_impact_1d']}% "
+                      f"۵روزه:{s['avg_impact_5d']}% ۲۰روزه:{s['avg_impact_20d']}%")
+        except Exception as e:
+            print(f"  {name}: خطا - {e}")
+    if not any_summary:
+        print("  هنوز هیچ خبری کامل ارزیابی نشده (نیاز به گذشت ۲۰ روز کاری از تاریخ هر خبر).")
+except Exception as e:
+    print(f"  خطا در ماژول تأثیر اخبار: {e}")
+
 # داشبورد
 print("\n🔄 بروزرسانی داشبورد...")
 try:
