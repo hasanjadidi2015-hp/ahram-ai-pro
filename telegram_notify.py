@@ -1,56 +1,45 @@
 # -*- coding: utf-8 -*-
-"""ارسال امن پیام تلگرام با timeout کوتاه."""
-
+"""ارسال پیام به تلگرام"""
 import requests
-
+from datetime import datetime, timedelta
 from telegram_config import TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
+
+# اگه تلگرام چندبار پشت سر هم fail کنه (مثلاً فیلترینگ)، دیگه تا مدتی
+# تلاش نمی‌کنیم -- وگرنه هر بار ۱۰ ثانیه تایم‌اوت هدر می‌ره و کل سیکل رو
+# کند می‌کنه.
+_consecutive_failures = 0
+_circuit_open_until = None
+_FAILURE_THRESHOLD = 3
+_COOLDOWN_MINUTES = 10
 
 
 def send_telegram_message(text):
-    """ارسال پیام و برگرداندن True/False بدون متوقف‌کردن ربات."""
-
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("[TELEGRAM] ERROR: TOKEN یا CHAT_ID تنظیم نشده است.")
+    global _consecutive_failures, _circuit_open_until
+    now = datetime.now()
+    if _circuit_open_until and now < _circuit_open_until:
         return False
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-
-    data = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": str(text)[:4000],
-    }
-
     try:
-        response = requests.post(
-            url,
-            json=data,
-            timeout=(3, 5),
-        )
-
-        if response.status_code == 200:
-            return True
-
-        print(
-            "[TELEGRAM] ERROR: "
-            f"HTTP {response.status_code} | "
-            f"{response.text[:300]}"
-        )
-        return False
-
-    except requests.exceptions.Timeout:
-        print("[TELEGRAM] ERROR: Timeout در اتصال به تلگرام.")
-        return False
-
-    except requests.exceptions.RequestException as e:
-        print("[TELEGRAM] ERROR:", e)
-        return False
-
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        data = {"chat_id": TELEGRAM_CHAT_ID, "text": text[:4000]}
+        r = requests.post(url, json=data, timeout=10)
+        ok = r.status_code == 200
+        if ok:
+            _consecutive_failures = 0
+            _circuit_open_until = None
+        else:
+            _consecutive_failures += 1
+        return ok
     except Exception as e:
-        print("[TELEGRAM] UNEXPECTED ERROR:", e)
+        print("[TELEGRAM] ERROR:", e)
+        _consecutive_failures += 1
+        if _consecutive_failures >= _FAILURE_THRESHOLD:
+            _circuit_open_until = now + timedelta(minutes=_COOLDOWN_MINUTES)
+            print(
+                f"[TELEGRAM] {_consecutive_failures} خطای پیاپی -- تا "
+                f"{_circuit_open_until.strftime('%H:%M')} موقتاً تلاش نمی‌کنیم"
+            )
         return False
-
 
 if __name__ == "__main__":
-    ok = send_telegram_message("🤖 تست تلگرام — AHRAM AI")
-
+    ok = send_telegram_message("🤖 تست تلگرام — ربات اهرم")
     print("OK" if ok else "FAIL")

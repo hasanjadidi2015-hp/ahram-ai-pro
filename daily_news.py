@@ -6,9 +6,12 @@
 
 قوانین ایمنی:
 1) خبرهای قدیمی ذخیره می‌شوند، اما اعلان نمی‌گیرند.
-2) فقط خبرهای حداکثر دو روز اخیر مجاز به اعلان هستند.
+2) فقط خبرهای حداکثر MAX_NEWS_AGE_DAYS روز اخیر مجاز به اعلان هستند.
 3) خبر بدون تاریخ معتبر فقط ذخیره می‌شود و اعلان ندارد.
-4) در هر سیکل حداکثر دو اعلان خبری برگردانده می‌شود.
+4) در هر سیکل حداکثر MAX_ALERTS_PER_CYCLE اعلان خبری برگردانده می‌شود.
+5) اطلاعیه‌های روتین چرخه‌ی عمر قرارداد آپشن/آتی (شروع/پایان دوره، تسویه)
+   حتی اگه تازه هم باشن، اعلان نمی‌گیرن -- فقط ذخیره می‌شن -- چون خبر
+   واقعی نیستن، هر ماه برای هر سری قرارداد پیش میان.
 """
 
 import json
@@ -87,8 +90,11 @@ def fetch_codal_notifications(ins_code=None, top=10):
         return data
 
     if isinstance(data, dict):
+        # نکته: کلید واقعی پاسخ TSETMC "preparedData"ست (تأیید شده روی
+        # داده‌ی زنده) -- بقیه‌ی کلیدها fallback احتیاطی‌ان.
         items = (
-            data.get("codalPreparedData")
+            data.get("preparedData")
+            or data.get("codalPreparedData")
             or data.get("codal")
             or data.get("data")
             or []
@@ -283,8 +289,9 @@ def _extract_event_date(item):
     """
     تاریخ خبر را برمی‌گرداند.
 
-    مهم‌ترین فیلد TSETMC برای پیام ناظر:
-      dEven = 20260824
+    فیلدهای رایج TSETMC:
+      پیام ناظر بازار : dEven = 20260824
+      اطلاعیه کدال     : publishDateTime_DEven = 20260727
 
     خروجی:
       YYYY-MM-DD
@@ -296,11 +303,14 @@ def _extract_event_date(item):
 
     possible_fields = (
         "dEven",
+        "publishDateTime_DEven",
         "date",
         "publishDate",
         "publish_date",
         "dateTime",
         "sendDate",
+        "publishDateTime_Gregorian",
+        "sentDateTime_Gregorian",
     )
 
     for key in possible_fields:
@@ -311,7 +321,8 @@ def _extract_event_date(item):
 
         digits = "".join(char for char in str(value) if char.isdigit())
 
-        # فرمت رایج TSETMC: YYYYMMDD
+        # فرمت رایج TSETMC: YYYYMMDD (اول رشته، چه خودش عدد خام باشه چه
+        # بخش اول یه datetime ایزو مثل 2026-07-27T08:18:26)
         if len(digits) >= 8:
             digits = digits[:8]
 
@@ -331,7 +342,7 @@ def _extract_event_date(item):
 
 def _is_recent_event(event_date_text):
     """
-    فقط خبرهای امروز، دیروز و حداکثر دو روز اخیر اجازه اعلان دارند.
+    فقط خبرهای امروز و حداکثر MAX_NEWS_AGE_DAYS روز اخیر اجازه اعلان دارند.
 
     خبر بدون تاریخ معتبر:
     ذخیره می‌شود، اما اعلان ندارد.
@@ -383,6 +394,24 @@ def _categorize(title):
             return category
 
     return "سایر"
+
+
+# پیام‌های ناظر بازار پر از اطلاعیه‌های روتین چرخه‌ی عمر قرارداد
+# آپشن/آتی‌ان (شروع/پایان دوره، تسویه) که هر ماه برای هر سری قرارداد جدید
+# پیش میان -- حتی اگه امروز هم منتشر شده باشن، خبر واقعی نیستن، فقط نویز.
+# اینا رو ثبت می‌کنیم (برای تاریخچه) ولی نوتیفای نمی‌کنیم.
+_ROUTINE_KEYWORDS = [
+    "آغاز دوره معاملاتي", "آغاز دوره معاملاتی",
+    "پايان دوره معاملاتي", "پایان دوره معاملاتی",
+    "تسويه نهايي", "تسویه نهایی",
+    "تسويه نقدي", "تسویه نقدی",
+    "تسويه فيزيكي", "تسویه فیزیکی",
+    "اطلاعيه درخصوص قرارداد اختيار معامله", "اطلاعیه درخصوص قرارداد اختیار معامله",
+]
+
+
+def _is_routine(title):
+    return any(kw in (title or "") for kw in _ROUTINE_KEYWORDS)
 
 
 def _serialize_raw(item):
@@ -453,7 +482,8 @@ def _save_item(cur, source, item, news_price):
 
 def check_daily_news(db_path=None, ins_code=None, top=10):
     """
-    خبرها را ذخیره می‌کند؛ فقط موارد جدید و تازه را برای اعلان برمی‌گرداند.
+    خبرها را ذخیره می‌کند؛ فقط موارد جدید، تازه، و غیرروتین را برای اعلان
+    برمی‌گرداند.
     """
     db_path = db_path or config.DATABASE_NAME
     ins_code = ins_code or config.INS_CODE
@@ -531,11 +561,18 @@ def check_daily_news(db_path=None, ins_code=None, top=10):
     conn.commit()
     conn.close()
 
-    # فقط خبرهای تازه به چرخه اصلی برگردند.
+    # فقط خبرهای تازه و غیرروتین به چرخه اصلی برگردند.
     alertable_items = [
         item for item in inserted_items
-        if _is_recent_event(item.get("event_date"))
+        if _is_recent_event(item.get("event_date")) and not _is_routine(item.get("title"))
     ]
+
+    routine_count = sum(
+        1 for item in inserted_items
+        if _is_recent_event(item.get("event_date")) and _is_routine(item.get("title"))
+    )
+    if routine_count:
+        print(f"[NEWS] {routine_count} خبر تازه ولی روتین بود (فقط ذخیره شد، اعلان نداد).")
 
     # سقف اعلان برای جلوگیری از کندشدن ربات
     if len(alertable_items) > MAX_ALERTS_PER_CYCLE:
@@ -544,7 +581,7 @@ def check_daily_news(db_path=None, ins_code=None, top=10):
             f"فقط {MAX_ALERTS_PER_CYCLE} مورد اول اعلان می‌گیرند."
         )
 
-    old_count = len(inserted_items) - len(alertable_items)
+    old_count = len(inserted_items) - len(alertable_items) - routine_count
 
     if old_count > 0:
         print(

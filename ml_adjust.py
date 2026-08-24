@@ -39,12 +39,26 @@ def _extract_features(option_decision, score):
         return None
 
 
+def _ensure_position_id_column(cur):
+    """train_model ممکنه قبل از اولین log_signal_to_db همین سیکل اجرا بشه --
+    یعنی قبل از اینکه اون تابع ستون position_id رو خودترمیم کنه. برای همین
+    اینجا هم خودمون چک می‌کنیم."""
+    try:
+        cur.execute("PRAGMA table_info(signal_history)")
+        cols = {r[1] for r in cur.fetchall()}
+        if "position_id" not in cols:
+            cur.execute("ALTER TABLE signal_history ADD COLUMN position_id TEXT")
+    except Exception:
+        pass
+
+
 def train_model(db_path):
     """مدل رو از سیگنال‌های ارزیابی‌شده‌ی (WIN/LOSS) همین دیتابیس آموزش می‌ده."""
     model_file, last_train_file = _model_paths(db_path)
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
+        _ensure_position_id_column(cur)
         cur.execute(
             "SELECT details, composite_score, outcome FROM signal_history "
             "WHERE outcome IN ('WIN','LOSS') AND details IS NOT NULL AND details != '' "
