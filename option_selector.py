@@ -408,6 +408,17 @@ class OptionSelector:
             print("⚠️ IV CRUSH RISK: آپشن در حباب نوسان است")
 
         print("DELTA:", option_data["delta"])
+        adv = option_data.get("advanced_greeks") or {}
+        if adv.get("available"):
+            print(
+                "ADVANCED GREEKS RISK:", adv.get("risk_level"),
+                f"| Charm/day={adv.get('charm_1d')} | Vanna/1%={adv.get('vanna_1pct')} "
+                f"| Volga/1%={adv.get('volga_1pct')} | Color/day={adv.get('color_pct_1d')}%"
+            )
+            for warning in adv.get("reasons", []):
+                print("  [AG]", warning)
+        else:
+            print("ADVANCED GREEKS RISK: UNKNOWN (داده/سررسید کافی نیست)")
         print("VALUATION:", option_data["valuation"])
         print("DISTANCE:", f"{option_data['distance_pct']}%")
         print("RISK/REWARD:", option_data["risk_reward_ratio"])

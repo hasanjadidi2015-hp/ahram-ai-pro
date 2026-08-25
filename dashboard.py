@@ -114,6 +114,7 @@ def _symbol_info(name, db):
         "signal": {"type": "WAIT", "score": None, "time": None, "option": None},
         "option_days": None, "option_volume": None,
         "gamma_wall": None, "gamma_regime": None, "gamma_conf": None,
+        "advanced_greeks": None,
         "order_state": "NO_DATA", "order_pressure": "UNKNOWN", "imbalance": None,
         "spread": None, "news_count": 0, "latest_news": None,
     }
@@ -126,6 +127,14 @@ def _symbol_info(name, db):
         if rows:
             info["price_time"], info["price"] = rows[0]
         info["signal"] = _latest_signal(cur)
+        # advanced_greeks در details سیگنال ذخیره می‌شود؛ صرفاً برای نمایش خوانده می‌شود.
+        try:
+            import json
+            details = info["signal"].get("details")
+            parsed = json.loads(details) if details else {}
+            info["advanced_greeks"] = ((parsed.get("option") or {}).get("advanced_greeks"))
+        except Exception:
+            pass
         opt = info["signal"].get("option")
         if opt:
             rows = _safe(cur, "SELECT days_to_expire, volume FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (opt,))
@@ -315,13 +324,20 @@ def generate():
         option_info = "بدون قرارداد منتخب"
         if info["signal"].get("option"):
             option_info = f"{option} · اعمال {_fmt(info['signal'].get('strike'))} · {info['option_days'] if info['option_days'] is not None else '—'} روز"
+        ag = info.get("advanced_greeks") or {}
+        ag_text = "Greeks پیشرفته: در انتظار داده"
+        ag_cls = "muted"
+        if ag.get("available"):
+            ag_level = ag.get("risk_level", "UNKNOWN")
+            ag_text = f"Greeks پیشرفته: ریسک {ag_level}"
+            ag_cls = "sell" if ag_level == "HIGH" else ("watch" if ag_level == "MEDIUM" else "buy")
         card_html += f'''<article class="symbol-card {sig_cls}">
           <div class="card-head"><h3>{_esc(info['name'])}</h3><span class="pill {sig_cls}">{sig_text}</span></div>
           <div class="price">{_fmt(info['price'])}<small>ریال</small></div>
           <div class="score"><span>امتیاز تصمیم</span><b>{score_text}</b></div>
           <div class="meter"><i class="{sig_cls}" style="width:{min(100, max(0, float(score or 0)))}%"></i></div>
           <div class="contract">{option_info}</div>
-          <div class="chips"><span class="chip {order_cls}">{order_text}</span><span class="chip muted">γ {gamma}</span></div>
+          <div class="chips"><span class="chip {order_cls}">{order_text}</span><span class="chip muted">γ {gamma}</span><span class="chip {ag_cls}">{ag_text}</span></div>
         </article>'''
 
     position_html = ""

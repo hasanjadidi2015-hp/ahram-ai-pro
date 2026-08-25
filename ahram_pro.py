@@ -61,7 +61,7 @@ CONFIG = {
     "max_position_hold_hours": 3,   # بعد از این مدت، پوزیشن باز-فرض‌شده منقضی می‌شه
     "risk_per_trade": 0.05,
     "capital": 100_000_000,
-    "telegram_enabled": False,
+    "telegram_enabled": True,
     "desktop_enabled": True,
     "dashboard_enabled": True,
 }
@@ -283,7 +283,8 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
     db = symbol_config["db"]
     state.log(f"🎯 تحلیل آپشن: {name}")
     result = {"selected": None, "wiv": None, "fog": None, "tape": None,
-               "volume_analysis": None, "gamma_exposure": None, "iv_rank": None}
+               "volume_analysis": None, "gamma_exposure": None, "iv_rank": None,
+               "advanced_greeks": None}
 
     try:
         OptionSelector = get_module("option_selector")
@@ -293,7 +294,15 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
             selector.close()
             if option:
                 result["selected"] = option
+                result["advanced_greeks"] = option.get("advanced_greeks")
                 state.log(f"  ✅ آپشن انتخاب شد: {option.get('symbol')}")
+                ag = result["advanced_greeks"] or {}
+                if ag.get("available"):
+                    state.log(
+                        f"  ℹ️ Greeks پیشرفته (اکتشافی): {ag.get('risk_level')} | "
+                        f"Charm/day {ag.get('charm_1d')} | Vanna/1% {ag.get('vanna_1pct')} | "
+                        f"Volga/1% {ag.get('volga_1pct')}"
+                    )
             else:
                 state.log(f"  ⚠️ آپشن مناسب پیدا نشد", "WARN")
     except Exception as e:

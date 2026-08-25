@@ -7,7 +7,6 @@ import math
 import sqlite3
 
 import config
-from advanced_greeks import calculate as calculate_advanced_greeks
 
 
 def _norm_cdf(x):
@@ -371,13 +370,6 @@ class OptionEngine:
                 f"(بلک-شولز اروپایی ممکنه ارزش واقعی رو کم‌تخمین زده باشه)"
             )
 
-        # فقط محاسبه و ثبت ریسک؛ روی انتخاب قرارداد یا confidence اثری ندارد.
-        advanced_greeks = calculate_advanced_greeks(
-            stock_price, strike_price, days_to_expire,
-            iv if iv is not None and iv > 0 else vol,
-            r, option_type,
-        )
-
         return {
             "stock_price": stock_price, "strike_price": strike_price,
             "option_price": option_price, "days_to_expire": days_to_expire,
@@ -399,7 +391,6 @@ class OptionEngine:
             "iv_bubble": iv_bubble,
             "distance_pct": distance_pct, "risk_reward_ratio": risk_reward_ratio,
             "probability_of_profit": probability_of_profit,
-            "advanced_greeks": advanced_greeks,
         }
 
 
