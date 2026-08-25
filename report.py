@@ -94,6 +94,39 @@ for name, db in DBS:
 if open_count == 0:
     print("  هیچ پوزیشن بازی نمونده.")
 
+# معامله‌های تسویه‌شده‌ی امروز (WIN/LOSS) -- بدون این بخش، «چرا فلان نماد
+# که کلی سیگنال گرفته بود پوزیشن بازش صفره» بی‌جواب می‌مونه: یا واقعاً
+# طی روز به هدف رسیده (WIN)، یا مشکوکه و باید بررسی بشه.
+print("\n📈 معامله‌های تسویه‌شده‌ی امروز:")
+resolved_count = 0
+wins_today = losses_today = 0
+for name, db in DBS:
+    try:
+        conn = sqlite3.connect(db)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT option_symbol, option_price, outcome, outcome_pct, MAX(time) "
+            "FROM signal_history WHERE outcome IN ('WIN','LOSS') AND position_id IS NOT NULL "
+            "AND time LIKE ? GROUP BY position_id ORDER BY MAX(time)",
+            (f"{today}%",),
+        )
+        rows = cur.fetchall()
+        for sym, entry, outcome, pct, last_time in rows:
+            icon = "✅" if outcome == "WIN" else "❌"
+            print(f"  {name} | {sym} | {icon} {outcome} ({pct:+}%) | تسویه: {last_time}")
+            resolved_count += 1
+            if outcome == "WIN":
+                wins_today += 1
+            else:
+                losses_today += 1
+        conn.close()
+    except Exception as e:
+        print(f"  {name}: خطا - {e}")
+if resolved_count == 0:
+    print("  امروز معامله‌ای تسویه نشده.")
+else:
+    print(f"  جمع: {wins_today} برد / {losses_today} باخت")
+
 # بررسی سلامت سیستم — تلاش برای پیدا کردن باگ/قطعی احتمالی
 print("\n🔍 بررسی سلامت (پیدا کردن مشکل احتمالی):")
 issues_found = 0
