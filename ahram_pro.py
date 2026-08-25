@@ -61,7 +61,7 @@ CONFIG = {
     "max_position_hold_hours": 3,   # بعد از این مدت، پوزیشن باز-فرض‌شده منقضی می‌شه
     "risk_per_trade": 0.05,
     "capital": 100_000_000,
-    "telegram_enabled": False,
+    "telegram_enabled": True,
     "desktop_enabled": True,
     "dashboard_enabled": True,
 }
@@ -172,10 +172,20 @@ def collect_market_data(symbol_config):
         ob = collect_order_book(db)
         data["market"]["order_book"] = ob
         if ob:
-            state.log(
-                f"  ℹ️ عمق سفارش (اکتشافی): بایاس {ob['pressure']} ({ob['imbalance_pct']}%) | "
-                f"اسپرد {ob['spread_pct']}%"
-            )
+            state_labels = {
+                "TWO_SIDED": None,  # حالت عادی -- امتیاز/اسپرد معنادارن
+                "LOCKED_BUY_QUEUE": "🔥 صف خرید قفل‌شده (هیچ فروشنده‌ای در ۵ ردیف نیست)",
+                "LOCKED_SELL_QUEUE": "🧊 صف فروش قفل‌شده (هیچ خریداری در ۵ ردیف نیست)",
+                "NO_DATA": "داده‌ای برای هیچ‌کدوم از دو طرف دریافت نشد",
+            }
+            label = state_labels.get(ob["market_state"])
+            if label:
+                state.log(f"  ℹ️ عمق سفارش (اکتشافی): {label}")
+            else:
+                state.log(
+                    f"  ℹ️ عمق سفارش (اکتشافی): بایاس {ob['pressure']} ({ob['imbalance_pct']}%) | "
+                    f"اسپرد {ob['spread_pct']}%"
+                )
         else:
             state.log("  ⚠️ عمق سفارش دریافت نشد (فیلدهای TSETMC رو چک کن)", "WARN")
     except Exception as e:

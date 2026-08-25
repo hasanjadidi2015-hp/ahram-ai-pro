@@ -153,13 +153,31 @@ def collect_order_book(db_path=None):
     spread = (best_sell - best_buy) if (best_buy and best_sell) else None
     spread_pct = round((spread / best_buy) * 100, 3) if (spread and best_buy) else None
 
+    # اعتبارسنجی دو طرف قبل از محاسبه‌ی فشار: اگه یه طرف کاملاً خالیه (نه
+    # قیمت داره، نه حجم، نه تعداد سفارش)، باید فرق بذاریم بین «صف واقعی
+    # قفل‌شده» (که یه پدیده‌ی واقعی بازاره) و «داده‌ی ناقص/خراب از API» --
+    # هر دو ظاهرشون توی حجم خام یکسانه، ولی معنیشون کاملاً فرق داره.
+    buy_side_empty = (best_buy in (None, 0)) and total_buy_vol == 0 and total_buy_cnt == 0
+    sell_side_empty = (best_sell in (None, 0)) and total_sell_vol == 0 and total_sell_cnt == 0
+
+    if buy_side_empty and sell_side_empty:
+        market_state = "NO_DATA"          # هیچ طرفی داده نداره -- به‌احتمال زیاد خرابی/خالی بودن پاسخ
+    elif sell_side_empty and not buy_side_empty:
+        market_state = "LOCKED_BUY_QUEUE"  # صف خرید قفل‌شده -- هیچ فروشنده‌ای نیست (پدیده‌ی واقعی بازار)
+    elif buy_side_empty and not sell_side_empty:
+        market_state = "LOCKED_SELL_QUEUE"  # صف فروش قفل‌شده -- هیچ خریداری نیست
+    else:
+        market_state = "TWO_SIDED"        # هر دو طرف داده‌ی معتبر دارن -- محاسبه‌ی فشار قابل‌اتکاست
+
     imbalance = None
-    if (total_buy_vol + total_sell_vol) > 0:
+    if market_state == "TWO_SIDED" and (total_buy_vol + total_sell_vol) > 0:
         imbalance = round(
             (total_buy_vol - total_sell_vol) / (total_buy_vol + total_sell_vol) * 100, 1
         )
 
-    if imbalance is None:
+    if market_state in ("LOCKED_BUY_QUEUE", "LOCKED_SELL_QUEUE", "NO_DATA"):
+        pressure = market_state
+    elif imbalance is None:
         pressure = "UNKNOWN"
     elif imbalance > 20:
         pressure = "BUY_HEAVY"
@@ -178,6 +196,7 @@ def collect_order_book(db_path=None):
         "total_sell_volume": total_sell_vol,
         "total_buy_count": total_buy_cnt,
         "total_sell_count": total_sell_cnt,
+        "market_state": market_state,
         "imbalance_pct": imbalance,
         "pressure": pressure,
         "levels": rows,
@@ -190,6 +209,7 @@ if __name__ == "__main__":
         print("=" * 50)
         print("عمق سفارش (تابلوخوانی زنده)")
         print("=" * 50)
+        print(f"وضعیت بازار: {result['market_state']}")
         print(f"بهترین خرید: {result['best_buy']} | بهترین فروش: {result['best_sell']}")
         print(f"اسپرد: {result['spread']} ({result['spread_pct']}%)")
         print(f"حجم صف خرید (۵ ردیف): {result['total_buy_volume']:,.0f}")
