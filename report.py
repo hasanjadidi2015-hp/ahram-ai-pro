@@ -33,6 +33,7 @@ print(f"\n📋 سیگنال‌های امروز ({today}):")
 total = 0
 signal_counts = {}   # name -> تعداد سیگنال امروز
 last_update = {}     # name -> آخرین زمان ثبت‌شده امروز
+all_times = {}        # name -> لیست همه‌ی زمان‌های امروز (برای تشخیص شکاف وسط روز)
 for name, db in DBS:
     try:
         conn = sqlite3.connect(db)
@@ -44,6 +45,7 @@ for name, db in DBS:
         )
         rows = cur.fetchall()
         signal_counts[name] = len(rows)
+        all_times[name] = [r[0] for r in rows]
         if rows:
             last_update[name] = rows[0][0]
             for r in rows:
@@ -57,6 +59,7 @@ for name, db in DBS:
     except Exception as e:
         signal_counts[name] = 0
         last_update[name] = None
+        all_times[name] = []
         print(f"  {name}: خطا - {e}")
 
 print(f"\n📊 کل سیگنال‌های امروز: {total}")
@@ -96,21 +99,39 @@ print("\n🔍 بررسی سلامت (پیدا کردن مشکل احتمالی):
 issues_found = 0
 MARKET_CLOSE = "12:30"
 STALE_TOLERANCE_MIN = 12  # کمتر از این فاصله تا پایان بازار طبیعیه (فاصله‌ی سیکل‌ها ۵ دقیقه‌ست)
+GAP_TOLERANCE_MIN = 15    # شکاف بیشتر از این بین دو سیگنال پشت‌سرهم مشکوکه
 for name, _db in DBS:
     if signal_counts.get(name, 0) == 0:
         print(f"  ⚠️ {name}: امروز هیچ سیگنالی ثبت نشده — احتمال قطعی در جمع‌آوری داده یا خطای تحلیل")
         issues_found += 1
-    else:
-        last_t = last_update.get(name)
-        if last_t:
-            last_hm = last_t.split(" ")[1][:5] if " " in last_t else None
-            if last_hm:
-                mc_h, mc_m = map(int, MARKET_CLOSE.split(":"))
-                lh, lm = map(int, last_hm.split(":"))
-                gap_min = (mc_h * 60 + mc_m) - (lh * 60 + lm)
-                if gap_min > STALE_TOLERANCE_MIN:
-                    print(f"  ⚠️ {name}: آخرین سیگنال ساعت {last_hm} ثبت شده ({gap_min} دقیقه قبل از پایان بازار {MARKET_CLOSE}) — احتمال توقف زودهنگام ربات")
-                    issues_found += 1
+        continue
+
+    last_t = last_update.get(name)
+    if last_t:
+        last_hm = last_t.split(" ")[1][:5] if " " in last_t else None
+        if last_hm:
+            mc_h, mc_m = map(int, MARKET_CLOSE.split(":"))
+            lh, lm = map(int, last_hm.split(":"))
+            gap_min = (mc_h * 60 + mc_m) - (lh * 60 + lm)
+            if gap_min > STALE_TOLERANCE_MIN:
+                print(f"  ⚠️ {name}: آخرین سیگنال ساعت {last_hm} ثبت شده ({gap_min} دقیقه قبل از پایان بازار {MARKET_CLOSE}) — احتمال توقف زودهنگام ربات")
+                issues_found += 1
+
+    # شکاف وسط روز -- قبلاً این چک وجود نداشت و یه توقف ۹۰ دقیقه‌ای رو
+    # ندیده گرفته بود چون فقط آخرین سیگنال روز رو چک می‌کرد، نه فاصله‌ی
+    # بین سیگنال‌های پشت‌سرهم.
+    times_today = sorted(all_times.get(name, []))
+    for i in range(1, len(times_today)):
+        try:
+            t1 = datetime.strptime(times_today[i-1].split(" ")[1], "%H:%M:%S")
+            t2 = datetime.strptime(times_today[i].split(" ")[1], "%H:%M:%S")
+            gap = (t2 - t1).total_seconds() / 60
+            if gap > GAP_TOLERANCE_MIN:
+                print(f"  ⚠️ {name}: شکاف {gap:.0f} دقیقه‌ای بین {times_today[i-1][11:16]} و {times_today[i][11:16]} — ربات توی این بازه سیگنالی ثبت نکرده")
+                issues_found += 1
+        except Exception:
+            continue
+
 if issues_found == 0:
     print("  ✅ چیز مشکوکی پیدا نشد.")
 
