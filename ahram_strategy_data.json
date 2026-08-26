@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-26 17:09:00",
+  "generated_at": "2026-08-26 22:04:34",
   "source": "AHRAM AI PRO SQLite databases",
   "read_only": true,
   "signals_modified": false,
@@ -1400,6 +1400,23 @@
           "vega": null
         }
       ],
+      "chain_metrics": {
+        "available": true,
+        "contracts_total": 72,
+        "calls_count": 36,
+        "puts_count": 36,
+        "contracts_with_oi": 69,
+        "call_volume": 38633.0,
+        "put_volume": 18251.0,
+        "call_put_volume_ratio": 2.116760725439702,
+        "call_open_interest": 3190002.0,
+        "put_open_interest": 2336070.0,
+        "call_put_oi_ratio": 1.3655421284464935,
+        "nearest_strike": 56000.0,
+        "nearest_strike_distance_pct": -1.3424474120009866,
+        "quality": "HIGH",
+        "role": "exploratory_only"
+      },
       "max_pain": [
         {
           "expiry": "1405/06/25",
@@ -2943,6 +2960,23 @@
           "vega": null
         }
       ],
+      "chain_metrics": {
+        "available": true,
+        "contracts_total": 78,
+        "calls_count": 39,
+        "puts_count": 39,
+        "contracts_with_oi": 66,
+        "call_volume": 46773.0,
+        "put_volume": 10584.0,
+        "call_put_volume_ratio": 4.41921768707483,
+        "call_open_interest": 43779433.0,
+        "put_open_interest": 8659841.0,
+        "call_put_oi_ratio": 5.055454597838459,
+        "nearest_strike": 1500.0,
+        "nearest_strike_distance_pct": 0.7387508394895903,
+        "quality": "HIGH",
+        "role": "exploratory_only"
+      },
       "max_pain": [
         {
           "expiry": "1405/06/18",
@@ -4543,6 +4577,23 @@
           "vega": null
         }
       ],
+      "chain_metrics": {
+        "available": true,
+        "contracts_total": 81,
+        "calls_count": 41,
+        "puts_count": 40,
+        "contracts_with_oi": 68,
+        "call_volume": 30644.0,
+        "put_volume": 15281.0,
+        "call_put_volume_ratio": 2.0053661409593615,
+        "call_open_interest": 20737821.0,
+        "put_open_interest": 14225304.0,
+        "call_put_oi_ratio": 1.4578121493923786,
+        "nearest_strike": 3000.0,
+        "nearest_strike_distance_pct": 1.8329938900203666,
+        "quality": "HIGH",
+        "role": "exploratory_only"
+      },
       "max_pain": [
         {
           "expiry": "1405/06/11",

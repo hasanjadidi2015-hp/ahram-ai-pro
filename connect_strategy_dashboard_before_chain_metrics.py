@@ -15,7 +15,7 @@ from html import escape
 
 TEMPLATE = "options_dashboard_AHRAM.html"
 DATA_FILE = "ahram_strategy_data.json"
-OUTPUT = "options_dashboard_AHRAM_LIVE4.html"
+OUTPUT = "options_dashboard_AHRAM_LIVE.html"
 
 
 def fmt(value):
@@ -53,7 +53,6 @@ def make_panel(payload):
         signal_type = signal.get("signal_type") or "—"
         score = signal.get("score")
         options_count = len(data.get("options") or [])
-        metrics = data.get("chain_metrics") or {}
 
         mp_line = "Max Pain: —"
         if latest_mp:
@@ -69,12 +68,6 @@ def make_panel(payload):
               <div class="ahram-price">{fmt(price.get('last_price'))}<small>ریال</small></div>
               <div class="ahram-row">امتیاز <b>{fmt(score)}</b></div>
               <div class="ahram-row">زنجیره آخر <b>{options_count} قرارداد</b></div>
-              <div class="ahram-row">حجم Call / Put <b>{fmt(metrics.get('call_volume'))} / {fmt(metrics.get('put_volume'))}</b></div>
-              <div class="ahram-row">نسبت OI کال به پوت <b>{fmt(metrics.get('call_put_oi_ratio'))}</b></div>
-              <div class="ahram-row">نزدیک‌ترین Strike <b>{fmt(metrics.get('nearest_strike'))}</b></div>
-              <div class="ahram-row">فاصله از Strike نزدیک <b>{pct(metrics.get('nearest_strike_distance_pct'))}</b></div>
-              <div class="ahram-row">قرارداد دارای OI <b>{fmt(metrics.get('contracts_with_oi'))}</b></div>
-              <div class="ahram-row">کیفیت زنجیره <b>{escape(str(metrics.get('quality') or '—'))}</b></div>
               <div class="ahram-row">{escape(mp_line)}</div>
               <div class="ahram-row ahram-muted">زمان قیمت: {escape(str(price.get('time') or '—'))}</div>
             </article>'''
@@ -93,43 +86,6 @@ def make_panel(payload):
       <div class="ahram-grid">{"".join(cards)}</div>
       <div class="ahram-note">این پنل فقط داده AHRAM را کنار داشبورد استراتژی نشان می‌دهد. انتخاب یا اجرای معامله همچنان باید با بررسی دستی انجام شود.</div>
       <script id="ahram-bridge-data">window.AHRAM_BRIDGE_DATA = {payload_json};</script>
-      <script id="ahram-chain-loader">
-      window.addEventListener("DOMContentLoaded", function () {{
-        try {{
-          const data = window.AHRAM_BRIDGE_DATA || {{}};
-          const symbols = data.symbols || {{}};
-          const calls = [], puts = [];
-          const stocks = {{}};
-          Object.keys(symbols).forEach(function (name) {{
-            const item = symbols[name] || {{}};
-            const price = item.price || {{}};
-            stocks[name] = Number(price.last_price || price.closing_price || 0);
-            (item.options || []).forEach(function (o) {{
-              const x = {{
-                sym: o.symbol, u: name, S: stocks[name], K: Number(o.strike_price || 0),
-                P: Number(o.option_price || 0), last: Number(o.option_price || 0),
-                close: Number(o.option_price || 0), expiry: o.expire_date || "",
-                days: Number(o.days_to_expire || 0), vol: Number(o.volume || 0),
-                bid: 0, ask: 0, live: false, source: "AHRAM SQLite"
-              }};
-              if (String(o.option_type || "").toUpperCase() === "PUT") puts.push(x);
-              else calls.push(x);
-            }});
-          }});
-          if (calls.length || puts.length) {{
-            allStocksMap = stocks;
-            allOptions = calls;
-            allPuts = puts;
-            liveOptionQuoteMode = false;
-            syncUnderlyingToOptions();
-            buildAllStrategies();
-            renderAllPages();
-            if (typeof renderSymbolDive === "function") renderSymbolDive();
-            if (typeof showToast === "function") showToast("✅ زنجیره واقعی AHRAM در محاسبات استراتژی بارگذاری شد؛ فقط تحلیلی");
-          }}
-        }} catch (err) {{ console.warn("AHRAM chain loader:", err); }}
-      }});
-      </script>
     </section>'''
 
 
@@ -158,15 +114,8 @@ def main():
 </style>'''
 
     lower = template.lower()
-    head_at = lower.rfind("</head>")
-    body_at = lower.rfind("</body>")
-    if head_at < 0 or body_at < 0:
-        raise ValueError("قالب HTML تگ‌های head/body کامل ندارد")
-    # استایل در head و پنل در body قرار می‌گیرد تا متن CSS در صفحه نمایش داده نشود.
-    # برای جلوگیری از نمایش متن CSS در برخی نسخه‌های فایل VIP، هیچ style tag جداگانه‌ای تزریق نمی‌شود.
-    # پنل همچنان داده‌ها را نمایش می‌دهد و فایل قالب بدون تغییر باقی می‌ماند.
-    body_at = template.lower().rfind("</body>")
-    output = template[:body_at] + panel + template[body_at:]
+    insert_at = lower.rfind("</body>")
+    output = template[:insert_at] + style + panel + template[insert_at:]
     with open(OUTPUT, "w", encoding="utf-8") as file:
         file.write(output)
 

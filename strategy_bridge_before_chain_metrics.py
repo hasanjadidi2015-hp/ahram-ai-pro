@@ -159,48 +159,6 @@ def get_latest_max_pain(connection):
     ]
 
 
-def calculate_chain_metrics(options, stock_price):
-    """شاخص‌های اکتشافی زنجیره؛ فقط برای ثبت و بررسی، بدون اثر بر سیگنال."""
-    calls = [x for x in options if str(x.get("option_type") or "").upper() == "CALL"]
-    puts = [x for x in options if str(x.get("option_type") or "").upper() == "PUT"]
-
-    def total(items, field):
-        return sum((safe_float(x.get(field)) or 0.0) for x in items)
-
-    call_volume = total(calls, "volume")
-    put_volume = total(puts, "volume")
-    call_oi = total(calls, "open_interest")
-    put_oi = total(puts, "open_interest")
-    oi_contracts = sum(1 for x in options if (safe_float(x.get("open_interest")) or 0) > 0)
-
-    nearest_strike = None
-    nearest_distance_pct = None
-    if stock_price and stock_price > 0:
-        strikes = [safe_float(x.get("strike_price")) for x in options]
-        strikes = sorted({x for x in strikes if x and x > 0})
-        if strikes:
-            nearest_strike = min(strikes, key=lambda strike: abs(strike - stock_price))
-            nearest_distance_pct = ((nearest_strike - stock_price) / stock_price) * 100.0
-
-    return {
-        "available": bool(options),
-        "contracts_total": len(options),
-        "calls_count": len(calls),
-        "puts_count": len(puts),
-        "contracts_with_oi": oi_contracts,
-        "call_volume": call_volume,
-        "put_volume": put_volume,
-        "call_put_volume_ratio": (call_volume / put_volume) if put_volume > 0 else None,
-        "call_open_interest": call_oi,
-        "put_open_interest": put_oi,
-        "call_put_oi_ratio": (call_oi / put_oi) if put_oi > 0 else None,
-        "nearest_strike": nearest_strike,
-        "nearest_strike_distance_pct": nearest_distance_pct,
-        "quality": "HIGH" if oi_contracts >= 10 and len(options) >= 20 else ("MEDIUM" if oi_contracts >= 5 else "LOW"),
-        "role": "exploratory_only",
-    }
-
-
 def build_symbol_data(name, db_path):
     if not os.path.exists(db_path):
         return {"database": db_path, "available": False}
@@ -208,17 +166,14 @@ def build_symbol_data(name, db_path):
     connection = sqlite3.connect(db_path)
     try:
         latest_options_time, options = get_latest_options(connection)
-        price = get_latest_price(connection)
-        stock_price = (price or {}).get("last_price") or (price or {}).get("closing_price")
         return {
             "name": name,
             "database": db_path,
             "available": True,
-            "price": price,
+            "price": get_latest_price(connection),
             "signal": get_latest_signal(connection),
             "options_snapshot_time": latest_options_time,
             "options": options,
-            "chain_metrics": calculate_chain_metrics(options, stock_price),
             "max_pain": get_latest_max_pain(connection),
         }
     finally:
