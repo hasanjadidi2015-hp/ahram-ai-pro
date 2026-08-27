@@ -9,6 +9,7 @@ import sys
 import sqlite3
 import time
 import json
+import concurrent.futures
 from datetime import datetime, time as dtime, timedelta
 from pathlib import Path
 
@@ -217,21 +218,39 @@ def collect_market_data(symbol_config):
     except Exception as e:
         state.log(f"  ⚠️ خطا آپشن: {e}", "WARN")
 
+    def _run_with_timeout(func, timeout=20):
+        """اجرای تابع با تایم‌اوت تا کل سیکل هنگ نکنه (مخصوص algotik_tse که گاهی هنگ می‌کنه)"""
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(func)
+                return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            state.log(f"  ⚠️ تایم‌اوت {timeout}ث در {getattr(func, '__name__', 'func')} - رد شد", "WARN")
+            return None
+        except Exception as e:
+            raise e
+
     try:
         index_feed = get_module("index_feed")
         if index_feed:
-            indices = index_feed()
-            data["market"]["indices"] = indices
-            state.log(f"  ✅ شاخص‌ها دریافت شد")
+            indices = _run_with_timeout(index_feed, timeout=20)
+            if indices is not None:
+                data["market"]["indices"] = indices
+                state.log(f"  ✅ شاخص‌ها دریافت شد")
+            else:
+                state.log(f"  ⚠️ شاخص‌ها تایم‌اوت/خالی - ادامه بدون شاخص", "WARN")
     except Exception as e:
         state.log(f"  ⚠️ خطا شاخص: {e}", "WARN")
 
     try:
         money_flow = get_module("money_flow")
         if money_flow:
-            flow = money_flow()
-            data["market"]["money_flow"] = flow
-            state.log(f"  ✅ جریان پول دریافت شد")
+            flow = _run_with_timeout(money_flow, timeout=20)
+            if flow is not None:
+                data["market"]["money_flow"] = flow
+                state.log(f"  ✅ جریان پول دریافت شد")
+            else:
+                state.log(f"  ⚠️ جریان پول تایم‌اوت/خالی - ادامه بدون جریان پول", "WARN")
     except Exception as e:
         state.log(f"  ⚠️ خطا جریان پول: {e}", "WARN")
 

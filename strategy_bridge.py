@@ -32,14 +32,17 @@ def row_dict(cursor, row):
 
 
 def get_latest_price(connection):
-    row = connection.execute(
-        """
-        SELECT id, time, last_price, closing_price, volume, trades
-        FROM prices
-        ORDER BY id DESC
-        LIMIT 1
-        """
-    ).fetchone()
+    try:
+        row = connection.execute(
+            """
+            SELECT id, time, last_price, closing_price, volume, trades
+            FROM prices
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
     if not row:
         return None
     return {
@@ -53,16 +56,19 @@ def get_latest_price(connection):
 
 
 def get_latest_signal(connection):
-    row = connection.execute(
-        """
-        SELECT id, time, symbol, signal_type, composite_score,
-               option_symbol, option_price, strike_price,
-               outcome, outcome_pct, details
-        FROM signal_history
-        ORDER BY id DESC
-        LIMIT 1
-        """
-    ).fetchone()
+    try:
+        row = connection.execute(
+            """
+            SELECT id, time, symbol, signal_type, composite_score,
+                   option_symbol, option_price, strike_price,
+                   outcome, outcome_pct, details
+            FROM signal_history
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
     if not row:
         return None
     return {
@@ -81,7 +87,10 @@ def get_latest_signal(connection):
 
 
 def get_latest_options(connection):
-    latest = connection.execute("SELECT MAX(id) FROM options").fetchone()[0]
+    try:
+        latest = connection.execute("SELECT MAX(id) FROM options").fetchone()[0]
+    except sqlite3.OperationalError:
+        return None, []
     if latest is None:
         return None, []
 
@@ -203,31 +212,63 @@ def calculate_chain_metrics(options, stock_price):
 
 def build_symbol_data(name, db_path):
     if not os.path.exists(db_path):
-        return {"database": db_path, "available": False}
+        return {"database": db_path, "available": False, "reason": "file not found"}
 
     connection = sqlite3.connect(db_path)
     try:
-        latest_options_time, options = get_latest_options(connection)
-        price = get_latest_price(connection)
-        stock_price = (price or {}).get("last_price") or (price or {}).get("closing_price")
+        # هر بخش جدا try میشه تا اگه یک جدول برای یک نماد وجود نداشت، کل اسکریپت برای همه نمادها کرش نکنه
+        try:
+            latest_options_time, options = get_latest_options(connection)
+        except Exception as e:
+            latest_options_time, options = None, []
+            print(f"[WARN] {name}: options خوانده نشد - {e}")
+
+        try:
+            price = get_latest_price(connection)
+        except Exception as e:
+            price = None
+            print(f"[WARN] {name}: prices خوانده نشد - {e}")
+
+        try:
+            signal = get_latest_signal(connection)
+        except Exception as e:
+            signal = None
+            print(f"[WARN] {name}: signal_history خوانده نشد - {e}")
+
+        try:
+            max_pain = get_latest_max_pain(connection)
+        except Exception as e:
+            max_pain = []
+            print(f"[WARN] {name}: max_pain خوانده نشد - {e}")
+
+        stock_price = None
+        if price:
+            stock_price = (price or {}).get("last_price") or (price or {}).get("closing_price")
+
+        try:
+            chain_metrics = calculate_chain_metrics(options, stock_price)
+        except Exception as e:
+            chain_metrics = {"available": False, "error": str(e)}
+
         return {
             "name": name,
             "database": db_path,
             "available": True,
             "price": price,
-            "signal": get_latest_signal(connection),
+            "signal": signal,
             "options_snapshot_time": latest_options_time,
             "options": options,
-            "chain_metrics": calculate_chain_metrics(options, stock_price),
-            "max_pain": get_latest_max_pain(connection),
+            "chain_metrics": chain_metrics,
+            "max_pain": max_pain,
         }
-    except sqlite3.OperationalError as e:
-        # دیتابیس هست ولی شِمای مورد انتظار رو نداره (مثلاً نمادی که هنوز
-        # هیچ سیکلی اجرا نشده) -- به‌جای کرش کل اسکریپت برای هر سه نماد،
-        # فقط همین یکی رو ناموجود اعلام می‌کنیم.
-        return {"database": db_path, "available": False, "error": str(e)}
+    except Exception as e:
+        print(f"[ERROR] {name}: خطای کلی در build_symbol_data - {e}")
+        return {"database": db_path, "available": False, "reason": str(e)}
     finally:
-        connection.close()
+        try:
+            connection.close()
+        except:
+            pass
 
 
 def build_payload():
