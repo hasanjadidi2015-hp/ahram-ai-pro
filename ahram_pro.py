@@ -219,15 +219,26 @@ def collect_market_data(symbol_config):
         state.log(f"  ⚠️ خطا آپشن: {e}", "WARN")
 
     def _run_with_timeout(func, timeout=20):
-        """اجرای تابع با تایم‌اوت تا کل سیکل هنگ نکنه (مخصوص algotik_tse که گاهی هنگ می‌کنه)"""
+        """اجرای تابع با تایم‌اوت تا کل سیکل هنگ نکنه (مخصوص algotik_tse که گاهی هنگ می‌کنه).
+
+        نکته‌ی مهم: نباید از `with ThreadPoolExecutor(...) as executor` استفاده
+        بشه -- خروج از اون بلاک به‌صورت پیش‌فرض shutdown(wait=True) صدا می‌زنه،
+        یعنی صبر می‌کنه thread هنگ‌کرده واقعاً تموم بشه، که دقیقاً همون هنگ
+        کردنی رو که این تابع قراره جلوش رو بگیره دوباره برمی‌گردونه (فقط با
+        یه پیام هشدار زودتر که گمراه‌کننده‌ست، چون کل سیکل بازم قفل می‌مونه).
+        """
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(func)
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(func)
-                return future.result(timeout=timeout)
+            result = future.result(timeout=timeout)
+            executor.shutdown(wait=False)
+            return result
         except concurrent.futures.TimeoutError:
             state.log(f"  ⚠️ تایم‌اوت {timeout}ث در {getattr(func, '__name__', 'func')} - رد شد", "WARN")
+            executor.shutdown(wait=False)
             return None
         except Exception as e:
+            executor.shutdown(wait=False)
             raise e
 
     try:
