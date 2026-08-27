@@ -200,6 +200,66 @@ try:
 except Exception as e:
     print(f"  ❌ خطا: {e}")
 
+# زنجیره قرارداد - خودکار روزانه (فقط خواندنی، بدون اثر بر سیگنال)
+# چون داده‌اش از خود TSETMC میاد و تمیزه، هر روز خودکار اجرا میشه
+# این بخش بعد از 10 روز کاری برای اتصالات اصلی استفاده میشه، الان فقط جمع‌آوری
+print("\n🔗 بروزرسانی زنجیره قرارداد (خودکار روزانه - فقط خواندنی)...")
+try:
+    import strategy_bridge
+    # strategy_bridge.main() از argparse استفاده می‌کنه، برای اینکه با آرگومان‌های report تداخل نکنه، sys.argv رو موقتا پاک می‌کنیم
+    import sys
+    old_argv = sys.argv
+    sys.argv = [old_argv[0]]
+    try:
+        strategy_bridge.main()
+        print("  ✅ پل استراتژی (ahram_strategy_data.json) بروز شد")
+    finally:
+        sys.argv = old_argv
+except Exception as e:
+    print(f"  ⚠️ خطا پل استراتژی: {e}")
+
+try:
+    import shadow_strategy
+    import sys
+    old_argv = sys.argv
+    sys.argv = [old_argv[0]]
+    try:
+        shadow_strategy.main()
+        print("  ✅ گزارش Shadow (ahram_shadow_report.json) بروز شد")
+    finally:
+        sys.argv = old_argv
+except Exception as e:
+    print(f"  ⚠️ خطا Shadow: {e}")
+
+try:
+    import connect_strategy_dashboard
+    import sys
+    old_argv = sys.argv
+    sys.argv = [old_argv[0]]
+    try:
+        connect_strategy_dashboard.main()
+        print("  ✅ داشبورد LIVE4 بروز شد")
+    finally:
+        sys.argv = old_argv
+except Exception as e:
+    print(f"  ⚠️ خطا اتصال داشبورد VIP: {e}")
+
+# Max Pain - خودکار روزانه (فقط محاسبه و ذخیره، بدون اثر بر سیگنال)
+print("\n📍 بروزرسانی Max Pain (خودکار روزانه - فقط ذخیره)...")
+try:
+    import max_pain
+    for _name, _db in DBS:
+        try:
+            results = max_pain.analyze_database(_db, save=True)
+            if results:
+                print(f"  ✅ Max Pain {_name}: {len(results)} سررسید محاسبه شد")
+            else:
+                print(f"  ⚠️ Max Pain {_name}: داده‌ای نبود")
+        except Exception as e:
+            print(f"  ⚠️ Max Pain {_name} خطا: {e}")
+except Exception as e:
+    print(f"  ⚠️ خطا کلی Max Pain: {e}")
+
 print("\n" + "=" * 60)
 print("✅ پایان گزارش")
 print("=" * 60)
