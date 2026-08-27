@@ -518,7 +518,7 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
 
     min_checks = 3
 
-    if passed_checks >= min_checks and final_score >= CONFIG["min_score"]:
+    if passed_checks >= min_checks and final_score >= CONFIG["min_score"] and option:
         if technicals["action"] in ("BUY", "STRONG BUY"):
             signal_type = "BUY_CALL"
         elif technicals["action"] in ("SELL", "STRONG SELL"):
@@ -526,6 +526,11 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         else:
             signal_type = "WATCH"
     else:
+        if passed_checks >= min_checks and final_score >= CONFIG["min_score"] and not option:
+            state.log(
+                "  ⚠️ شرایط تکنیکال/چک‌ها برای BUY کافی بود ولی هیچ آپشنی انتخاب نشد -> WATCH",
+                "WARN",
+            )
         signal_type = "WATCH"
 
     display_score = max(0, round(final_score))  # فقط برای نمایش؛ تصمیم BUY/WATCH بالاتر با مقدار خام گرفته شده

@@ -221,6 +221,11 @@ def build_symbol_data(name, db_path):
             "chain_metrics": calculate_chain_metrics(options, stock_price),
             "max_pain": get_latest_max_pain(connection),
         }
+    except sqlite3.OperationalError as e:
+        # دیتابیس هست ولی شِمای مورد انتظار رو نداره (مثلاً نمادی که هنوز
+        # هیچ سیکلی اجرا نشده) -- به‌جای کرش کل اسکریپت برای هر سه نماد،
+        # فقط همین یکی رو ناموجود اعلام می‌کنیم.
+        return {"database": db_path, "available": False, "error": str(e)}
     finally:
         connection.close()
 
