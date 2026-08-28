@@ -1,6 +1,6 @@
 """
-AHRAM AI PRO V5 - پل مستقل داده برای داشبورد استراتژی + V2
-این فایل دیتابیس‌ها را می‌خواند و JSON با V2 تولید می‌کند
+AHRAM AI PRO V5 - پل مستقل داده برای داشبورد استراتژی + V2 + Sentiment
+این فایل دیتابیس‌ها را می‌خواند و JSON با V2 و Sentiment تولید می‌کند
 هیچ فایل اصلی، سیگنال، امتیاز را تغییر نمی‌دهد - فقط خواندنی
 """
 
@@ -39,7 +39,6 @@ def get_latest_price(connection):
     }
 
 def get_latest_signal(connection):
-    # تلاش برای خواندن ستون‌های V2 هم
     try:
         row = connection.execute(
             "SELECT id, time, symbol, signal_type, composite_score, option_symbol, option_price, strike_price, outcome, outcome_pct, details, v2_score, v2_decision, v2_best_symbol FROM signal_history ORDER BY id DESC LIMIT 1"
@@ -112,8 +111,43 @@ def get_iv_history(connection):
     except:
         return []
 
+def get_order_book_info(connection):
+    try:
+        rows = connection.execute("SELECT buy_price, sell_price, buy_volume, sell_volume FROM order_book ORDER BY id DESC LIMIT 5").fetchall()
+        if not rows:
+            return None
+        buy_prices = [float(r[0] or 0) for r in rows]
+        sell_prices = [float(r[1] or 0) for r in rows]
+        buy_vol = sum(float(r[2] or 0) for r in rows)
+        sell_vol = sum(float(r[3] or 0) for r in rows)
+        has_buy, has_sell = any(buy_prices), any(sell_prices)
+        if has_buy and not has_sell:
+            return {"market_state": "LOCKED_BUY_QUEUE", "pressure": "BUY_QUEUE", "imbalance_pct": None}
+        elif has_sell and not has_buy:
+            return {"market_state": "LOCKED_SELL_QUEUE", "pressure": "SELL_QUEUE", "imbalance_pct": None}
+        elif has_buy and has_sell and buy_vol + sell_vol > 0:
+            imb = round((buy_vol - sell_vol) / (buy_vol + sell_vol) * 100, 1)
+            if imb > 20:
+                press = "BUY_HEAVY"
+            elif imb < -20:
+                press = "SELL_HEAVY"
+            else:
+                press = "BALANCED"
+            return {"market_state": "TWO_SIDED", "pressure": press, "imbalance_pct": imb}
+    except:
+        pass
+    return None
+
+def get_money_flow_info():
+    try:
+        if os.path.exists("money_flow.json"):
+            with open("money_flow.json", "r", encoding="utf-8") as f:
+                return json.load(f)
+    except:
+        pass
+    return None
+
 def get_v2_analysis_from_details(details_str):
-    """استخراج تحلیل V2 از details JSON"""
     if not details_str:
         return None
     try:
@@ -121,7 +155,6 @@ def get_v2_analysis_from_details(details_str):
         v2 = data.get("v2_decision")
         if v2:
             return v2
-        # fallback از فیلدهای مستقیم
         if data.get("v2_best"):
             return {"best_contract": data.get("v2_best"), "final_score": data.get("v2_score"), "decision": data.get("v2_decision")}
     except:
@@ -188,6 +221,10 @@ def build_symbol_data(name, db_path):
             iv_hist = get_iv_history(connection)
         except Exception as e:
             iv_hist = []
+        try:
+            order_book = get_order_book_info(connection)
+        except:
+            order_book = None
 
         stock_price = None
         if price:
@@ -195,10 +232,47 @@ def build_symbol_data(name, db_path):
 
         chain_metrics = calculate_chain_metrics(options, stock_price)
 
-        # V2 analysis از details
         v2_analysis = None
         if signal and signal.get("details"):
             v2_analysis = get_v2_analysis_from_details(signal["details"])
+
+        # Sentiment V2 - محاسبه زنده
+        sentiment_v2 = None
+        try:
+            from sentiment_engine_v2 import analyze_sentiment
+            # wiv از signal_history details یا از فایل؟
+            wiv_data = None
+            try:
+                if signal and signal.get("details"):
+                    det = json.loads(signal["details"])
+                    opt = det.get("option") or {}
+                    # wiv در options_analysis قدیمی است
+                    wiv_data = det.get("wiv") or (det.get("options_analysis") or {}).get("wiv")
+            except:
+                pass
+            market_data_for_sent = {
+                "money_flow": get_money_flow_info() or {},
+                "order_book": order_book or {},
+                "news": [],
+                "indices": {}
+            }
+            # news از DB
+            try:
+                cur = connection.cursor()
+                cur.execute("SELECT title, category FROM daily_news WHERE event_date=date('now') ORDER BY id DESC LIMIT 10")
+                news_rows = cur.fetchall()
+                market_data_for_sent["news"] = [{"title": r[0], "category": r[1]} for r in news_rows]
+            except:
+                pass
+
+            sentiment_v2 = analyze_sentiment(
+                db_path=db_path,
+                market_data=market_data_for_sent,
+                wiv_data=wiv_data,
+                options_data=options
+            )
+        except Exception as e:
+            print(f"[WARN] {name}: sentiment V2 - {e}")
 
         return {
             "name": name, "database": db_path, "available": True,
@@ -207,7 +281,9 @@ def build_symbol_data(name, db_path):
             "options": options, "chain_metrics": chain_metrics,
             "max_pain": max_pain,
             "iv_history": iv_hist,
-            "v2_analysis": v2_analysis,  # جدید V5
+            "v2_analysis": v2_analysis,
+            "sentiment_v2": sentiment_v2,  # جدید
+            "order_book": order_book,
         }
     except Exception as e:
         print(f"[ERROR] {name}: {e}")
@@ -221,30 +297,34 @@ def build_symbol_data(name, db_path):
 def build_payload():
     return {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "source": "AHRAM AI PRO V5 SQLite + V2 Engines",
+        "source": "AHRAM AI PRO V5 + V2 + Sentiment",
         "read_only": True,
         "signals_modified": False,
         "v2_enabled": True,
-        "v2_modules": ["greek_engine_v2", "iv_engine_v2", "risk_engine_v2", "contract_scoring_engine_v2", "decision_engine_v2"],
+        "sentiment_enabled": True,
+        "v2_modules": ["greek_engine_v2", "iv_engine_v2", "risk_engine_v2", "contract_scoring_engine_v2", "decision_engine_v2", "sentiment_engine_v2"],
         "symbols": {name: build_symbol_data(name, db_path) for name, db_path in DATABASES.items()},
     }
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Export V5 AHRAM data with V2")
+    parser = argparse.ArgumentParser(description="Export V5 + Sentiment")
     parser.add_argument("--output", default=OUTPUT_FILE, help="نام فایل JSON خروجی")
     args = parser.parse_args()
     payload = build_payload()
     with open(args.output, "w", encoding="utf-8") as output:
         json.dump(payload, output, ensure_ascii=False, indent=2)
-    print("✅ پل V5 اجرا شد")
+    print("✅ پل V5 + Sentiment اجرا شد")
     print("OUTPUT:", args.output)
-    print("V2 ENABLED: True")
+    print("V2 + Sentiment ENABLED: True")
     for name, data in payload["symbols"].items():
         opt_count = len(data.get("options", [])) if data.get("available") else 0
         v2 = data.get("v2_analysis")
         v2_score = v2.get("final_score") if v2 else None
-        print(f"{name}: options={opt_count} | V2 Score={v2_score}")
+        sent = data.get("sentiment_v2")
+        fg = sent.get("fear_greed", {}).get("fear_greed") if sent else None
+        fg_level = sent.get("fear_greed", {}).get("level") if sent else None
+        print(f"{name}: options={opt_count} | V2 Score={v2_score} | Fear&Greed={fg} {fg_level}")
 
 if __name__ == "__main__":
     main()

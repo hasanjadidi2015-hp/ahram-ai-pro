@@ -100,6 +100,15 @@ except Exception as _e:
     _HAS_DECISION_V2 = False
     print(f"[WARN] decision_engine_v2 بارگذاری نشد: {_e}")
 
+try:
+    from sentiment_engine_v2 import analyze_sentiment as analyze_sentiment_v2
+    _HAS_SENTIMENT_V2 = True
+    print(f"[OK] sentiment_engine_v2 بارگذاری شد")
+except Exception as _e:
+    analyze_sentiment_v2 = None
+    _HAS_SENTIMENT_V2 = False
+    print(f"[WARN] sentiment_engine_v2 بارگذاری نشد: {_e}")
+
 CONFIG = {
     "version": "5.0",
     "name": "AHRAM AI PRO V5",
@@ -488,6 +497,66 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
         except Exception as e:
             state.log(f"  ⚠️ خطا تحلیل حجم: {e}", "WARN")
 
+    # ===== بخش جدید V2 - Sentiment Engine =====
+    if CONFIG.get("v2_enabled") and _HAS_SENTIMENT_V2:
+        try:
+            state.log(f"  🔬 تحلیل Sentiment V2 شروع...")
+            # market_data برای sentiment از collect_market_data میاد ولی اینجا نداریم - از get_module ها می‌گیریم
+            # برای سادگی: از DB و فایل‌های موجود
+            sentiment_market = {}
+            try:
+                # money_flow
+                mf_mod = get_module("money_flow")
+                # order_book قبلا در collect گرفته شده ولی اینجا نداریم - از DB می‌خونیم
+                from order_book import collect_order_book as _ob_collect
+                # این فقط برای تست - در اجرای اصلی market_data از بالا میاد
+                pass
+            except:
+                pass
+            # برای الان: از فایل‌های JSON اگر موجود باشن
+            # در analyze_symbol، market_data را به analyze_options پاس نمی‌دهیم، پس اینجا فقط با DB کار می‌کنیم
+            # sentiment را با داده‌های موجود از result می‌سازیم
+            wiv_for_sent = result.get("wiv")
+            # ساخت market_data ساده برای sentiment
+            sentiment_input = {
+                "money_flow": {},  # در run_cycle اصلی پر می‌شود
+                "order_book": {}, 
+                "news": [],
+                "indices": {}
+            }
+            # سعی کن از فایل‌های اخیر بخوانی
+            try:
+                if os.path.exists("money_flow.json"):
+                    import json as _json
+                    with open("money_flow.json", "r", encoding="utf-8") as _f:
+                        sentiment_input["money_flow"] = _json.load(_f)
+            except:
+                pass
+
+            # تحلیل sentiment
+            if analyze_sentiment_v2:
+                # اگر در حافظه market_data داریم از collect_market_data قبلی استفاده کن
+                # اینجا چون market_data نداریم، فقط با wiv و DB تحلیل می‌کنیم
+                sent_analysis = analyze_sentiment_v2(
+                    db_path=db,
+                    market_data=sentiment_input,
+                    wiv_data=wiv_for_sent,
+                    iv_rank_data=result.get("iv_rank"),
+                    options_data=result.get("v2_all_contracts")
+                )
+                result["sentiment_v2"] = sent_analysis
+                fg = sent_analysis.get("fear_greed", {})
+                state.log(f"  ✅ Sentiment V2: Fear & Greed {fg.get('fear_greed')}/100 {fg.get('level')} - {fg.get('opportunity')}")
+                if sent_analysis.get("risks"):
+                    for r in sent_analysis["risks"][:2]:
+                        state.log(f"    ⚠️ {r}")
+                if sent_analysis.get("opportunities"):
+                    for o in sent_analysis["opportunities"][:2]:
+                        state.log(f"    ✅ {o}")
+            state.log(f"  🔬 تحلیل Sentiment V2 تمام شد")
+        except Exception as e:
+            state.log(f"  ⚠️ خطا Sentiment V2: {e}", "WARN")
+
     # ===== بخش جدید V2 - Option Decision System =====
     if CONFIG.get("v2_enabled") and _HAS_GREEK_V2 and _HAS_RISK_V2 and _HAS_SCORING_V2:
         try:
@@ -503,8 +572,9 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
                     if analyze_iv_v2:
                         iv_analysis = analyze_iv_v2(db, current_iv=cur_iv)
                         result["v2_iv"] = iv_analysis
-                        if iv_analysis.get("iv_rank", {}).get("iv_rank") is not None:
-                            state.log(f"  ✅ IV V2: Rank {iv_analysis['iv_rank']['iv_rank']}% Percentile {iv_analysis['iv_percentile']['iv_percentile']}% Regime {iv_analysis['regime']['iv_regime']}")
+                        rank = iv_analysis.get("iv_rank", {})
+                        if rank.get("iv_rank") is not None:
+                            state.log(f"  ✅ IV V2: Rank {rank.get('iv_rank')}% Percentile {rank.get('iv_percentile')}% Regime {iv_analysis.get('regime')} Ready {rank.get('ready')}")
                 except Exception as e:
                     state.log(f"  ⚠️ خطا IV V2: {e}", "WARN")
 
@@ -1107,7 +1177,7 @@ def run():
     print(f"📊 نمادها: {', '.join(s['name'] for s in CONFIG['symbols'])}")
     print(f"⏰ ساعات: {CONFIG['market_open']} - {CONFIG['market_close']}")
     print(f"🔄 سیکل: هر {CONFIG['cycle_seconds']} ثانیه")
-    print(f"🔬 V2 Enabled: {CONFIG['v2_enabled']} | Greek V2: {_HAS_GREEK_V2} | IV V2: {_HAS_IV_V2} | Risk V2: {_HAS_RISK_V2} | Scoring V2: {_HAS_SCORING_V2} | Decision V2: {_HAS_DECISION_V2}")
+    print(f"🔬 V2 Enabled: {CONFIG['v2_enabled']} | Greek V2: {_HAS_GREEK_V2} | IV V2: {_HAS_IV_V2} | Risk V2: {_HAS_RISK_V2} | Scoring V2: {_HAS_SCORING_V2} | Decision V2: {_HAS_DECISION_V2} | Sentiment V2: {_HAS_SENTIMENT_V2}")
     print()
 
     while True:

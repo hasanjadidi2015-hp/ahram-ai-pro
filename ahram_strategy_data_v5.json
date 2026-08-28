@@ -1,15 +1,17 @@
 {
-  "generated_at": "2026-08-28 18:48:29",
-  "source": "AHRAM AI PRO V5 SQLite + V2 Engines",
+  "generated_at": "2026-08-28 20:59:31",
+  "source": "AHRAM AI PRO V5 + V2 + Sentiment",
   "read_only": true,
   "signals_modified": false,
   "v2_enabled": true,
+  "sentiment_enabled": true,
   "v2_modules": [
     "greek_engine_v2",
     "iv_engine_v2",
     "risk_engine_v2",
     "contract_scoring_engine_v2",
-    "decision_engine_v2"
+    "decision_engine_v2",
+    "sentiment_engine_v2"
   ],
   "symbols": {
     "اهرم": {
@@ -25,8 +27,8 @@
         "trades": 3479.0
       },
       "signal": {
-        "id": 160,
-        "time": "2026-08-28 17:28:00",
+        "id": 162,
+        "time": "2026-08-28 20:51:55",
         "symbol": "اهرم",
         "signal_type": "WATCH",
         "score": 42.0,
@@ -35,16 +37,16 @@
         "strike_price": null,
         "outcome": "PENDING",
         "outcome_pct": 0.0,
-        "details": "{\"type\": \"WATCH\", \"score\": 42, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 76.7% (HIGH)\", \"✅ FOG: LIGHT\", \"⚠️ TAPE: 3/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-28T17:28:00.441596\", \"v2_decision\": null, \"v2_score\": null, \"message\": \"\\nاهرم: WATCH (امتیاز: 42)\\n\"}",
+        "details": "{\"type\": \"WATCH\", \"score\": 42, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 76.7% (HIGH)\", \"✅ FOG: LIGHT\", \"⚠️ TAPE: 3/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-28T20:51:55.167719\", \"v2_decision\": null, \"v2_score\": null, \"message\": \"\\nاهرم: WATCH (امتیاز: 42)\\n\"}",
         "v2_score": null,
         "v2_decision": null,
         "v2_best_symbol": null
       },
-      "options_snapshot_time": "2026-08-28 17:27:50",
+      "options_snapshot_time": "2026-08-28 20:51:49",
       "options": [
         {
-          "id": 38437,
-          "time": "2026-08-28 17:27:50",
+          "id": 38581,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7050",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -62,8 +64,8 @@
           "vega": null
         },
         {
-          "id": 38473,
-          "time": "2026-08-28 17:27:50",
+          "id": 38617,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7050",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -81,8 +83,8 @@
           "vega": null
         },
         {
-          "id": 38438,
-          "time": "2026-08-28 17:27:50",
+          "id": 38582,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7051",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -100,8 +102,8 @@
           "vega": null
         },
         {
-          "id": 38474,
-          "time": "2026-08-28 17:27:50",
+          "id": 38618,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7051",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -119,8 +121,8 @@
           "vega": null
         },
         {
-          "id": 38439,
-          "time": "2026-08-28 17:27:50",
+          "id": 38583,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7052",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -138,8 +140,8 @@
           "vega": null
         },
         {
-          "id": 38475,
-          "time": "2026-08-28 17:27:50",
+          "id": 38619,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7052",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -157,8 +159,8 @@
           "vega": null
         },
         {
-          "id": 38425,
-          "time": "2026-08-28 17:27:50",
+          "id": 38569,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6040",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -176,8 +178,8 @@
           "vega": null
         },
         {
-          "id": 38440,
-          "time": "2026-08-28 17:27:50",
+          "id": 38584,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7053",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -195,8 +197,8 @@
           "vega": null
         },
         {
-          "id": 38461,
-          "time": "2026-08-28 17:27:50",
+          "id": 38605,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6040",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -214,8 +216,8 @@
           "vega": null
         },
         {
-          "id": 38476,
-          "time": "2026-08-28 17:27:50",
+          "id": 38620,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7053",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -233,8 +235,8 @@
           "vega": null
         },
         {
-          "id": 38426,
-          "time": "2026-08-28 17:27:50",
+          "id": 38570,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6041",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -252,8 +254,8 @@
           "vega": null
         },
         {
-          "id": 38441,
-          "time": "2026-08-28 17:27:50",
+          "id": 38585,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7054",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -271,8 +273,8 @@
           "vega": null
         },
         {
-          "id": 38462,
-          "time": "2026-08-28 17:27:50",
+          "id": 38606,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6041",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -290,8 +292,8 @@
           "vega": null
         },
         {
-          "id": 38477,
-          "time": "2026-08-28 17:27:50",
+          "id": 38621,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7054",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -309,8 +311,8 @@
           "vega": null
         },
         {
-          "id": 38427,
-          "time": "2026-08-28 17:27:50",
+          "id": 38571,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6042",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -328,8 +330,8 @@
           "vega": null
         },
         {
-          "id": 38442,
-          "time": "2026-08-28 17:27:50",
+          "id": 38586,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7055",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -347,8 +349,8 @@
           "vega": null
         },
         {
-          "id": 38450,
-          "time": "2026-08-28 17:27:50",
+          "id": 38594,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8024",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -366,8 +368,8 @@
           "vega": null
         },
         {
-          "id": 38463,
-          "time": "2026-08-28 17:27:50",
+          "id": 38607,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6042",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -385,8 +387,8 @@
           "vega": null
         },
         {
-          "id": 38478,
-          "time": "2026-08-28 17:27:50",
+          "id": 38622,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7055",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -404,8 +406,8 @@
           "vega": null
         },
         {
-          "id": 38486,
-          "time": "2026-08-28 17:27:50",
+          "id": 38630,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8024",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -423,8 +425,8 @@
           "vega": null
         },
         {
-          "id": 38428,
-          "time": "2026-08-28 17:27:50",
+          "id": 38572,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6043",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -442,8 +444,8 @@
           "vega": null
         },
         {
-          "id": 38443,
-          "time": "2026-08-28 17:27:50",
+          "id": 38587,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7056",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -461,8 +463,8 @@
           "vega": null
         },
         {
-          "id": 38451,
-          "time": "2026-08-28 17:27:50",
+          "id": 38595,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8025",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -480,8 +482,8 @@
           "vega": null
         },
         {
-          "id": 38464,
-          "time": "2026-08-28 17:27:50",
+          "id": 38608,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6043",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -499,8 +501,8 @@
           "vega": null
         },
         {
-          "id": 38479,
-          "time": "2026-08-28 17:27:50",
+          "id": 38623,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7056",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -518,8 +520,8 @@
           "vega": null
         },
         {
-          "id": 38487,
-          "time": "2026-08-28 17:27:50",
+          "id": 38631,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8025",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -537,8 +539,8 @@
           "vega": null
         },
         {
-          "id": 38429,
-          "time": "2026-08-28 17:27:50",
+          "id": 38573,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6044",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -556,8 +558,8 @@
           "vega": null
         },
         {
-          "id": 38444,
-          "time": "2026-08-28 17:27:50",
+          "id": 38588,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7057",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -575,8 +577,8 @@
           "vega": null
         },
         {
-          "id": 38452,
-          "time": "2026-08-28 17:27:50",
+          "id": 38596,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8026",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -594,8 +596,8 @@
           "vega": null
         },
         {
-          "id": 38465,
-          "time": "2026-08-28 17:27:50",
+          "id": 38609,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6044",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -613,8 +615,8 @@
           "vega": null
         },
         {
-          "id": 38480,
-          "time": "2026-08-28 17:27:50",
+          "id": 38624,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7057",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -632,8 +634,8 @@
           "vega": null
         },
         {
-          "id": 38488,
-          "time": "2026-08-28 17:27:50",
+          "id": 38632,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8026",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -651,8 +653,8 @@
           "vega": null
         },
         {
-          "id": 38430,
-          "time": "2026-08-28 17:27:50",
+          "id": 38574,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6045",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -670,8 +672,8 @@
           "vega": null
         },
         {
-          "id": 38445,
-          "time": "2026-08-28 17:27:50",
+          "id": 38589,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7058",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -689,8 +691,8 @@
           "vega": null
         },
         {
-          "id": 38453,
-          "time": "2026-08-28 17:27:50",
+          "id": 38597,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8027",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -708,8 +710,8 @@
           "vega": null
         },
         {
-          "id": 38466,
-          "time": "2026-08-28 17:27:50",
+          "id": 38610,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6045",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -727,8 +729,8 @@
           "vega": null
         },
         {
-          "id": 38481,
-          "time": "2026-08-28 17:27:50",
+          "id": 38625,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7058",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -746,8 +748,8 @@
           "vega": null
         },
         {
-          "id": 38489,
-          "time": "2026-08-28 17:27:50",
+          "id": 38633,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8027",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -765,8 +767,8 @@
           "vega": null
         },
         {
-          "id": 38431,
-          "time": "2026-08-28 17:27:50",
+          "id": 38575,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6046",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -784,8 +786,8 @@
           "vega": null
         },
         {
-          "id": 38446,
-          "time": "2026-08-28 17:27:50",
+          "id": 38590,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7059",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -803,8 +805,8 @@
           "vega": null
         },
         {
-          "id": 38454,
-          "time": "2026-08-28 17:27:50",
+          "id": 38598,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8028",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -822,8 +824,8 @@
           "vega": null
         },
         {
-          "id": 38467,
-          "time": "2026-08-28 17:27:50",
+          "id": 38611,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6046",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -841,8 +843,8 @@
           "vega": null
         },
         {
-          "id": 38482,
-          "time": "2026-08-28 17:27:50",
+          "id": 38626,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7059",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -860,8 +862,8 @@
           "vega": null
         },
         {
-          "id": 38490,
-          "time": "2026-08-28 17:27:50",
+          "id": 38634,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8028",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -879,8 +881,8 @@
           "vega": null
         },
         {
-          "id": 38432,
-          "time": "2026-08-28 17:27:50",
+          "id": 38576,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6047",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -898,8 +900,8 @@
           "vega": null
         },
         {
-          "id": 38447,
-          "time": "2026-08-28 17:27:50",
+          "id": 38591,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7060",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -917,8 +919,8 @@
           "vega": null
         },
         {
-          "id": 38455,
-          "time": "2026-08-28 17:27:50",
+          "id": 38599,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8029",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -936,8 +938,8 @@
           "vega": null
         },
         {
-          "id": 38468,
-          "time": "2026-08-28 17:27:50",
+          "id": 38612,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6047",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -955,8 +957,8 @@
           "vega": null
         },
         {
-          "id": 38483,
-          "time": "2026-08-28 17:27:50",
+          "id": 38627,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7060",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -974,8 +976,8 @@
           "vega": null
         },
         {
-          "id": 38491,
-          "time": "2026-08-28 17:27:50",
+          "id": 38635,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8029",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -993,8 +995,8 @@
           "vega": null
         },
         {
-          "id": 38433,
-          "time": "2026-08-28 17:27:50",
+          "id": 38577,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6048",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1012,8 +1014,8 @@
           "vega": null
         },
         {
-          "id": 38448,
-          "time": "2026-08-28 17:27:50",
+          "id": 38592,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7061",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1031,8 +1033,8 @@
           "vega": null
         },
         {
-          "id": 38456,
-          "time": "2026-08-28 17:27:50",
+          "id": 38600,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8030",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1050,8 +1052,8 @@
           "vega": null
         },
         {
-          "id": 38469,
-          "time": "2026-08-28 17:27:50",
+          "id": 38613,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6048",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1069,8 +1071,8 @@
           "vega": null
         },
         {
-          "id": 38484,
-          "time": "2026-08-28 17:27:50",
+          "id": 38628,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7061",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1088,8 +1090,8 @@
           "vega": null
         },
         {
-          "id": 38492,
-          "time": "2026-08-28 17:27:50",
+          "id": 38636,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8030",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1107,8 +1109,8 @@
           "vega": null
         },
         {
-          "id": 38434,
-          "time": "2026-08-28 17:27:50",
+          "id": 38578,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6049",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1126,8 +1128,8 @@
           "vega": null
         },
         {
-          "id": 38449,
-          "time": "2026-08-28 17:27:50",
+          "id": 38593,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم7062",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1145,8 +1147,8 @@
           "vega": null
         },
         {
-          "id": 38457,
-          "time": "2026-08-28 17:27:50",
+          "id": 38601,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8031",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1164,8 +1166,8 @@
           "vega": null
         },
         {
-          "id": 38470,
-          "time": "2026-08-28 17:27:50",
+          "id": 38614,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6049",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1183,8 +1185,8 @@
           "vega": null
         },
         {
-          "id": 38485,
-          "time": "2026-08-28 17:27:50",
+          "id": 38629,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم7062",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1202,8 +1204,8 @@
           "vega": null
         },
         {
-          "id": 38493,
-          "time": "2026-08-28 17:27:50",
+          "id": 38637,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8031",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1221,8 +1223,8 @@
           "vega": null
         },
         {
-          "id": 38435,
-          "time": "2026-08-28 17:27:50",
+          "id": 38579,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6050",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1240,8 +1242,8 @@
           "vega": null
         },
         {
-          "id": 38458,
-          "time": "2026-08-28 17:27:50",
+          "id": 38602,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8032",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1259,8 +1261,8 @@
           "vega": null
         },
         {
-          "id": 38471,
-          "time": "2026-08-28 17:27:50",
+          "id": 38615,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6050",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1278,8 +1280,8 @@
           "vega": null
         },
         {
-          "id": 38494,
-          "time": "2026-08-28 17:27:50",
+          "id": 38638,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8032",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1297,8 +1299,8 @@
           "vega": null
         },
         {
-          "id": 38436,
-          "time": "2026-08-28 17:27:50",
+          "id": 38580,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم6051",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1316,8 +1318,8 @@
           "vega": null
         },
         {
-          "id": 38459,
-          "time": "2026-08-28 17:27:50",
+          "id": 38603,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8033",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1335,8 +1337,8 @@
           "vega": null
         },
         {
-          "id": 38472,
-          "time": "2026-08-28 17:27:50",
+          "id": 38616,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم6051",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1354,8 +1356,8 @@
           "vega": null
         },
         {
-          "id": 38495,
-          "time": "2026-08-28 17:27:50",
+          "id": 38639,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8033",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1373,8 +1375,8 @@
           "vega": null
         },
         {
-          "id": 38460,
-          "time": "2026-08-28 17:27:50",
+          "id": 38604,
+          "time": "2026-08-28 20:51:49",
           "symbol": "ضهرم8034",
           "option_type": "CALL",
           "stock_price": 56762.0,
@@ -1392,8 +1394,8 @@
           "vega": null
         },
         {
-          "id": 38496,
-          "time": "2026-08-28 17:27:50",
+          "id": 38640,
+          "time": "2026-08-28 20:51:49",
           "symbol": "طهرم8034",
           "option_type": "PUT",
           "stock_price": 56762.0,
@@ -1470,7 +1472,128 @@
           "iv": 0.6539
         }
       ],
-      "v2_analysis": null
+      "v2_analysis": null,
+      "sentiment_v2": {
+        "fear_greed": {
+          "fear_greed": 66.5,
+          "level": "GREED",
+          "opportunity": "احتیاط - طمع",
+          "breakdown": [
+            "pc: GREED Score 75 Weight 30.0%",
+            "money_flow: NEUTRAL Score 50 Weight 25.0%",
+            "order_book: EXTREME GREED - صف خرید قفل‌شده Score 95 Weight 20.0%",
+            "bpi: NEUTRAL Score 50 Weight 15.0%",
+            "news: NEUTRAL Score 50 Weight 10.0%"
+          ],
+          "weights": {
+            "pc": 0.3,
+            "money_flow": 0.25,
+            "order_book": 0.2,
+            "bpi": 0.15,
+            "news": 0.1
+          }
+        },
+        "iran_vix": {
+          "vix": 61.4,
+          "level": "FEAR",
+          "source": "IV_HISTORY_DB"
+        },
+        "put_call_ratio": {
+          "pc_volume": 0.48,
+          "pc_oi": 0.74,
+          "pc_combined": 0.74,
+          "sentiment": "GREED",
+          "score": 75
+        },
+        "money_flow": {
+          "retail_net": null,
+          "institutional_net": null,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "order_book": {
+          "imbalance_pct": null,
+          "pressure": "BUY_QUEUE",
+          "market_state": "LOCKED_BUY_QUEUE",
+          "sentiment": "EXTREME GREED - صف خرید قفل‌شده",
+          "score": 95
+        },
+        "bpi": {
+          "bpi_pct": null,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "news": {
+          "news_count": 0,
+          "sentiment_score": 0,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "high_low": {
+          "high_52w_count": null,
+          "low_52w_count": null,
+          "high_low_ratio": null,
+          "sentiment": "NEUTRAL - نیاز به داده کل بازار TSETMC",
+          "score": 50,
+          "note": "برای پیاده‌سازی کامل باید از TSETMC تعداد نمادهای سقف/کف 52 هفته گرفت - فعلا پروکسی"
+        },
+        "components": {
+          "pc": {
+            "pc_volume": 0.48,
+            "pc_oi": 0.74,
+            "pc_combined": 0.74,
+            "sentiment": "GREED",
+            "score": 75
+          },
+          "money_flow": {
+            "retail_net": null,
+            "institutional_net": null,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "order_book": {
+            "imbalance_pct": null,
+            "pressure": "BUY_QUEUE",
+            "market_state": "LOCKED_BUY_QUEUE",
+            "sentiment": "EXTREME GREED - صف خرید قفل‌شده",
+            "score": 95
+          },
+          "bpi": {
+            "bpi_pct": null,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "news": {
+            "news_count": 0,
+            "sentiment_score": 0,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "high_low": {
+            "high_52w_count": null,
+            "low_52w_count": null,
+            "high_low_ratio": null,
+            "sentiment": "NEUTRAL - نیاز به داده کل بازار TSETMC",
+            "score": 50,
+            "note": "برای پیاده‌سازی کامل باید از TSETMC تعداد نمادهای سقف/کف 52 هفته گرفت - فعلا پروکسی"
+          },
+          "vix": {
+            "vix": 61.4,
+            "level": "FEAR",
+            "source": "IV_HISTORY_DB"
+          }
+        },
+        "risks": [
+          "صف خرید قفل‌شده - طمع شدید - مراقب تله حقوقی باش"
+        ],
+        "opportunities": [],
+        "timestamp": "2026-08-28T20:59:31.885194"
+      },
+      "order_book": {
+        "market_state": "LOCKED_BUY_QUEUE",
+        "pressure": "BUY_QUEUE",
+        "imbalance_pct": null
+      }
     },
     "وبملت": {
       "name": "وبملت",
@@ -1485,8 +1608,8 @@
         "trades": 30818.0
       },
       "signal": {
-        "id": 156,
-        "time": "2026-08-28 17:28:13",
+        "id": 158,
+        "time": "2026-08-28 20:52:04",
         "symbol": "وبملت",
         "signal_type": "WATCH",
         "score": 51.0,
@@ -1495,16 +1618,16 @@
         "strike_price": null,
         "outcome": null,
         "outcome_pct": null,
-        "details": "{\"type\": \"WATCH\", \"score\": 51, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 55.0% (ELEVATED)\", \"✅ FOG: LIGHT\", \"⚠️ TAPE: 4/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-28T17:28:13.712519\", \"v2_decision\": null, \"v2_score\": null, \"message\": \"\\nوبملت: WATCH (امتیاز: 51)\\n\"}",
+        "details": "{\"type\": \"WATCH\", \"score\": 51, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 55.0% (ELEVATED)\", \"✅ FOG: LIGHT\", \"⚠️ TAPE: 4/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-28T20:52:04.995768\", \"v2_decision\": null, \"v2_score\": null, \"message\": \"\\nوبملت: WATCH (امتیاز: 51)\\n\"}",
         "v2_score": null,
         "v2_decision": null,
         "v2_best_symbol": null
       },
-      "options_snapshot_time": "2026-08-28 17:28:09",
+      "options_snapshot_time": "2026-08-28 20:52:01",
       "options": [
         {
-          "id": 37079,
-          "time": "2026-08-28 17:28:09",
+          "id": 37235,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6015",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1522,8 +1645,8 @@
           "vega": null
         },
         {
-          "id": 37092,
-          "time": "2026-08-28 17:28:09",
+          "id": 37248,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7036",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1541,8 +1664,8 @@
           "vega": null
         },
         {
-          "id": 37118,
-          "time": "2026-08-28 17:28:09",
+          "id": 37274,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6015",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1560,8 +1683,8 @@
           "vega": null
         },
         {
-          "id": 37131,
-          "time": "2026-08-28 17:28:09",
+          "id": 37287,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7036",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1579,8 +1702,8 @@
           "vega": null
         },
         {
-          "id": 37080,
-          "time": "2026-08-28 17:28:09",
+          "id": 37236,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6016",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1598,8 +1721,8 @@
           "vega": null
         },
         {
-          "id": 37093,
-          "time": "2026-08-28 17:28:09",
+          "id": 37249,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7037",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1617,8 +1740,8 @@
           "vega": null
         },
         {
-          "id": 37119,
-          "time": "2026-08-28 17:28:09",
+          "id": 37275,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6016",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1636,8 +1759,8 @@
           "vega": null
         },
         {
-          "id": 37132,
-          "time": "2026-08-28 17:28:09",
+          "id": 37288,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7037",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1655,8 +1778,8 @@
           "vega": null
         },
         {
-          "id": 37105,
-          "time": "2026-08-28 17:28:09",
+          "id": 37261,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8068",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1674,8 +1797,8 @@
           "vega": null
         },
         {
-          "id": 37144,
-          "time": "2026-08-28 17:28:09",
+          "id": 37300,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8068",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1693,8 +1816,8 @@
           "vega": null
         },
         {
-          "id": 37081,
-          "time": "2026-08-28 17:28:09",
+          "id": 37237,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6017",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1712,8 +1835,8 @@
           "vega": null
         },
         {
-          "id": 37094,
-          "time": "2026-08-28 17:28:09",
+          "id": 37250,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7038",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1731,8 +1854,8 @@
           "vega": null
         },
         {
-          "id": 37120,
-          "time": "2026-08-28 17:28:09",
+          "id": 37276,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6017",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1750,8 +1873,8 @@
           "vega": null
         },
         {
-          "id": 37133,
-          "time": "2026-08-28 17:28:09",
+          "id": 37289,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7038",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1769,8 +1892,8 @@
           "vega": null
         },
         {
-          "id": 37106,
-          "time": "2026-08-28 17:28:09",
+          "id": 37262,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8069",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1788,8 +1911,8 @@
           "vega": null
         },
         {
-          "id": 37145,
-          "time": "2026-08-28 17:28:09",
+          "id": 37301,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8069",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1807,8 +1930,8 @@
           "vega": null
         },
         {
-          "id": 37082,
-          "time": "2026-08-28 17:28:09",
+          "id": 37238,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6018",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1826,8 +1949,8 @@
           "vega": null
         },
         {
-          "id": 37095,
-          "time": "2026-08-28 17:28:09",
+          "id": 37251,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7039",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1845,8 +1968,8 @@
           "vega": null
         },
         {
-          "id": 37121,
-          "time": "2026-08-28 17:28:09",
+          "id": 37277,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6018",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1864,8 +1987,8 @@
           "vega": null
         },
         {
-          "id": 37134,
-          "time": "2026-08-28 17:28:09",
+          "id": 37290,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7039",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1883,8 +2006,8 @@
           "vega": null
         },
         {
-          "id": 37107,
-          "time": "2026-08-28 17:28:09",
+          "id": 37263,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8070",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1902,8 +2025,8 @@
           "vega": null
         },
         {
-          "id": 37146,
-          "time": "2026-08-28 17:28:09",
+          "id": 37302,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8070",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1921,8 +2044,8 @@
           "vega": null
         },
         {
-          "id": 37083,
-          "time": "2026-08-28 17:28:09",
+          "id": 37239,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6019",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1940,8 +2063,8 @@
           "vega": null
         },
         {
-          "id": 37096,
-          "time": "2026-08-28 17:28:09",
+          "id": 37252,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7040",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -1959,8 +2082,8 @@
           "vega": null
         },
         {
-          "id": 37122,
-          "time": "2026-08-28 17:28:09",
+          "id": 37278,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6019",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1978,8 +2101,8 @@
           "vega": null
         },
         {
-          "id": 37135,
-          "time": "2026-08-28 17:28:09",
+          "id": 37291,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7040",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -1997,8 +2120,8 @@
           "vega": null
         },
         {
-          "id": 37108,
-          "time": "2026-08-28 17:28:09",
+          "id": 37264,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8071",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2016,8 +2139,8 @@
           "vega": null
         },
         {
-          "id": 37147,
-          "time": "2026-08-28 17:28:09",
+          "id": 37303,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8071",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2035,8 +2158,8 @@
           "vega": null
         },
         {
-          "id": 37084,
-          "time": "2026-08-28 17:28:09",
+          "id": 37240,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6020",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2054,8 +2177,8 @@
           "vega": null
         },
         {
-          "id": 37097,
-          "time": "2026-08-28 17:28:09",
+          "id": 37253,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7041",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2073,8 +2196,8 @@
           "vega": null
         },
         {
-          "id": 37123,
-          "time": "2026-08-28 17:28:09",
+          "id": 37279,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6020",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2092,8 +2215,8 @@
           "vega": null
         },
         {
-          "id": 37136,
-          "time": "2026-08-28 17:28:09",
+          "id": 37292,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7041",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2111,8 +2234,8 @@
           "vega": null
         },
         {
-          "id": 37109,
-          "time": "2026-08-28 17:28:09",
+          "id": 37265,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8072",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2130,8 +2253,8 @@
           "vega": null
         },
         {
-          "id": 37148,
-          "time": "2026-08-28 17:28:09",
+          "id": 37304,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8072",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2149,8 +2272,8 @@
           "vega": null
         },
         {
-          "id": 37085,
-          "time": "2026-08-28 17:28:09",
+          "id": 37241,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6021",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2168,8 +2291,8 @@
           "vega": null
         },
         {
-          "id": 37098,
-          "time": "2026-08-28 17:28:09",
+          "id": 37254,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7042",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2187,8 +2310,8 @@
           "vega": null
         },
         {
-          "id": 37124,
-          "time": "2026-08-28 17:28:09",
+          "id": 37280,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6021",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2206,8 +2329,8 @@
           "vega": null
         },
         {
-          "id": 37137,
-          "time": "2026-08-28 17:28:09",
+          "id": 37293,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7042",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2225,8 +2348,8 @@
           "vega": null
         },
         {
-          "id": 37110,
-          "time": "2026-08-28 17:28:09",
+          "id": 37266,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8073",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2244,8 +2367,8 @@
           "vega": null
         },
         {
-          "id": 37149,
-          "time": "2026-08-28 17:28:09",
+          "id": 37305,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8073",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2263,8 +2386,8 @@
           "vega": null
         },
         {
-          "id": 37086,
-          "time": "2026-08-28 17:28:09",
+          "id": 37242,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6022",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2282,8 +2405,8 @@
           "vega": null
         },
         {
-          "id": 37099,
-          "time": "2026-08-28 17:28:09",
+          "id": 37255,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7043",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2301,8 +2424,8 @@
           "vega": null
         },
         {
-          "id": 37125,
-          "time": "2026-08-28 17:28:09",
+          "id": 37281,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6022",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2320,8 +2443,8 @@
           "vega": null
         },
         {
-          "id": 37138,
-          "time": "2026-08-28 17:28:09",
+          "id": 37294,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7043",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2339,8 +2462,8 @@
           "vega": null
         },
         {
-          "id": 37111,
-          "time": "2026-08-28 17:28:09",
+          "id": 37267,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8074",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2358,8 +2481,8 @@
           "vega": null
         },
         {
-          "id": 37150,
-          "time": "2026-08-28 17:28:09",
+          "id": 37306,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8074",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2377,8 +2500,8 @@
           "vega": null
         },
         {
-          "id": 37087,
-          "time": "2026-08-28 17:28:09",
+          "id": 37243,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6023",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2396,8 +2519,8 @@
           "vega": null
         },
         {
-          "id": 37100,
-          "time": "2026-08-28 17:28:09",
+          "id": 37256,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7044",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2415,8 +2538,8 @@
           "vega": null
         },
         {
-          "id": 37126,
-          "time": "2026-08-28 17:28:09",
+          "id": 37282,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6023",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2434,8 +2557,8 @@
           "vega": null
         },
         {
-          "id": 37139,
-          "time": "2026-08-28 17:28:09",
+          "id": 37295,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7044",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2453,8 +2576,8 @@
           "vega": null
         },
         {
-          "id": 37112,
-          "time": "2026-08-28 17:28:09",
+          "id": 37268,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8075",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2472,8 +2595,8 @@
           "vega": null
         },
         {
-          "id": 37151,
-          "time": "2026-08-28 17:28:09",
+          "id": 37307,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8075",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2491,8 +2614,8 @@
           "vega": null
         },
         {
-          "id": 37088,
-          "time": "2026-08-28 17:28:09",
+          "id": 37244,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6024",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2510,8 +2633,8 @@
           "vega": null
         },
         {
-          "id": 37101,
-          "time": "2026-08-28 17:28:09",
+          "id": 37257,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7045",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2529,8 +2652,8 @@
           "vega": null
         },
         {
-          "id": 37127,
-          "time": "2026-08-28 17:28:09",
+          "id": 37283,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6024",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2548,8 +2671,8 @@
           "vega": null
         },
         {
-          "id": 37140,
-          "time": "2026-08-28 17:28:09",
+          "id": 37296,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7045",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2567,8 +2690,8 @@
           "vega": null
         },
         {
-          "id": 37113,
-          "time": "2026-08-28 17:28:09",
+          "id": 37269,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8076",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2586,8 +2709,8 @@
           "vega": null
         },
         {
-          "id": 37152,
-          "time": "2026-08-28 17:28:09",
+          "id": 37308,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8076",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2605,8 +2728,8 @@
           "vega": null
         },
         {
-          "id": 37089,
-          "time": "2026-08-28 17:28:09",
+          "id": 37245,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6025",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2624,8 +2747,8 @@
           "vega": null
         },
         {
-          "id": 37102,
-          "time": "2026-08-28 17:28:09",
+          "id": 37258,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7046",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2643,8 +2766,8 @@
           "vega": null
         },
         {
-          "id": 37128,
-          "time": "2026-08-28 17:28:09",
+          "id": 37284,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6025",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2662,8 +2785,8 @@
           "vega": null
         },
         {
-          "id": 37141,
-          "time": "2026-08-28 17:28:09",
+          "id": 37297,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7046",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2681,8 +2804,8 @@
           "vega": null
         },
         {
-          "id": 37114,
-          "time": "2026-08-28 17:28:09",
+          "id": 37270,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8077",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2700,8 +2823,8 @@
           "vega": null
         },
         {
-          "id": 37153,
-          "time": "2026-08-28 17:28:09",
+          "id": 37309,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8077",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2719,8 +2842,8 @@
           "vega": null
         },
         {
-          "id": 37090,
-          "time": "2026-08-28 17:28:09",
+          "id": 37246,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6026",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2738,8 +2861,8 @@
           "vega": null
         },
         {
-          "id": 37103,
-          "time": "2026-08-28 17:28:09",
+          "id": 37259,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7047",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2757,8 +2880,8 @@
           "vega": null
         },
         {
-          "id": 37129,
-          "time": "2026-08-28 17:28:09",
+          "id": 37285,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6026",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2776,8 +2899,8 @@
           "vega": null
         },
         {
-          "id": 37142,
-          "time": "2026-08-28 17:28:09",
+          "id": 37298,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7047",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2795,8 +2918,8 @@
           "vega": null
         },
         {
-          "id": 37115,
-          "time": "2026-08-28 17:28:09",
+          "id": 37271,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8078",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2814,8 +2937,8 @@
           "vega": null
         },
         {
-          "id": 37154,
-          "time": "2026-08-28 17:28:09",
+          "id": 37310,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8078",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2833,8 +2956,8 @@
           "vega": null
         },
         {
-          "id": 37091,
-          "time": "2026-08-28 17:28:09",
+          "id": 37247,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت6027",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2852,8 +2975,8 @@
           "vega": null
         },
         {
-          "id": 37104,
-          "time": "2026-08-28 17:28:09",
+          "id": 37260,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت7048",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2871,8 +2994,8 @@
           "vega": null
         },
         {
-          "id": 37130,
-          "time": "2026-08-28 17:28:09",
+          "id": 37286,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت6027",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2890,8 +3013,8 @@
           "vega": null
         },
         {
-          "id": 37143,
-          "time": "2026-08-28 17:28:09",
+          "id": 37299,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت7048",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2909,8 +3032,8 @@
           "vega": null
         },
         {
-          "id": 37116,
-          "time": "2026-08-28 17:28:09",
+          "id": 37272,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8079",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2928,8 +3051,8 @@
           "vega": null
         },
         {
-          "id": 37155,
-          "time": "2026-08-28 17:28:09",
+          "id": 37311,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8079",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -2947,8 +3070,8 @@
           "vega": null
         },
         {
-          "id": 37117,
-          "time": "2026-08-28 17:28:09",
+          "id": 37273,
+          "time": "2026-08-28 20:52:01",
           "symbol": "ضملت8080",
           "option_type": "CALL",
           "stock_price": 1489.0,
@@ -2966,8 +3089,8 @@
           "vega": null
         },
         {
-          "id": 37156,
-          "time": "2026-08-28 17:28:09",
+          "id": 37312,
+          "time": "2026-08-28 20:52:01",
           "symbol": "طملت8080",
           "option_type": "PUT",
           "stock_price": 1489.0,
@@ -3048,7 +3171,129 @@
           "iv": 0.5136
         }
       ],
-      "v2_analysis": null
+      "v2_analysis": null,
+      "sentiment_v2": {
+        "fear_greed": {
+          "fear_greed": 71.0,
+          "level": "GREED",
+          "opportunity": "احتیاط - طمع",
+          "breakdown": [
+            "pc: EXTREME GREED Score 90 Weight 30.0%",
+            "money_flow: NEUTRAL Score 50 Weight 25.0%",
+            "order_book: EXTREME GREED - صف خرید قفل‌شده Score 95 Weight 20.0%",
+            "bpi: NEUTRAL Score 50 Weight 15.0%",
+            "news: NEUTRAL Score 50 Weight 10.0%"
+          ],
+          "weights": {
+            "pc": 0.3,
+            "money_flow": 0.25,
+            "order_book": 0.2,
+            "bpi": 0.15,
+            "news": 0.1
+          }
+        },
+        "iran_vix": {
+          "vix": 44.1,
+          "level": "NEUTRAL",
+          "source": "IV_HISTORY_DB"
+        },
+        "put_call_ratio": {
+          "pc_volume": 0.23,
+          "pc_oi": 0.2,
+          "pc_combined": 0.2,
+          "sentiment": "EXTREME GREED",
+          "score": 90
+        },
+        "money_flow": {
+          "retail_net": null,
+          "institutional_net": null,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "order_book": {
+          "imbalance_pct": null,
+          "pressure": "BUY_QUEUE",
+          "market_state": "LOCKED_BUY_QUEUE",
+          "sentiment": "EXTREME GREED - صف خرید قفل‌شده",
+          "score": 95
+        },
+        "bpi": {
+          "bpi_pct": null,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "news": {
+          "news_count": 0,
+          "sentiment_score": 0,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "high_low": {
+          "high_52w_count": null,
+          "low_52w_count": null,
+          "high_low_ratio": null,
+          "sentiment": "NEUTRAL - نیاز به داده کل بازار TSETMC",
+          "score": 50,
+          "note": "برای پیاده‌سازی کامل باید از TSETMC تعداد نمادهای سقف/کف 52 هفته گرفت - فعلا پروکسی"
+        },
+        "components": {
+          "pc": {
+            "pc_volume": 0.23,
+            "pc_oi": 0.2,
+            "pc_combined": 0.2,
+            "sentiment": "EXTREME GREED",
+            "score": 90
+          },
+          "money_flow": {
+            "retail_net": null,
+            "institutional_net": null,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "order_book": {
+            "imbalance_pct": null,
+            "pressure": "BUY_QUEUE",
+            "market_state": "LOCKED_BUY_QUEUE",
+            "sentiment": "EXTREME GREED - صف خرید قفل‌شده",
+            "score": 95
+          },
+          "bpi": {
+            "bpi_pct": null,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "news": {
+            "news_count": 0,
+            "sentiment_score": 0,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "high_low": {
+            "high_52w_count": null,
+            "low_52w_count": null,
+            "high_low_ratio": null,
+            "sentiment": "NEUTRAL - نیاز به داده کل بازار TSETMC",
+            "score": 50,
+            "note": "برای پیاده‌سازی کامل باید از TSETMC تعداد نمادهای سقف/کف 52 هفته گرفت - فعلا پروکسی"
+          },
+          "vix": {
+            "vix": 44.1,
+            "level": "NEUTRAL",
+            "source": "IV_HISTORY_DB"
+          }
+        },
+        "risks": [
+          "P/C OI پایین 0.2 - همه کال می‌خرن - سقف نزدیک",
+          "صف خرید قفل‌شده - طمع شدید - مراقب تله حقوقی باش"
+        ],
+        "opportunities": [],
+        "timestamp": "2026-08-28T20:59:31.932783"
+      },
+      "order_book": {
+        "market_state": "LOCKED_BUY_QUEUE",
+        "pressure": "BUY_QUEUE",
+        "imbalance_pct": null
+      }
     },
     "شستا": {
       "name": "شستا",
@@ -3063,8 +3308,8 @@
         "trades": 4295.0
       },
       "signal": {
-        "id": 159,
-        "time": "2026-08-28 17:28:20",
+        "id": 161,
+        "time": "2026-08-28 20:52:12",
         "symbol": "شستا",
         "signal_type": "WATCH",
         "score": 41.0,
@@ -3073,16 +3318,16 @@
         "strike_price": null,
         "outcome": null,
         "outcome_pct": null,
-        "details": "{\"type\": \"WATCH\", \"score\": 41, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 53.4% (ELEVATED)\", \"✅ FOG: LIGHT\", \"⚠️ TAPE: 2/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-28T17:28:20.758732\", \"v2_decision\": null, \"v2_score\": null, \"message\": \"\\nشستا: WATCH (امتیاز: 41)\\n\"}",
+        "details": "{\"type\": \"WATCH\", \"score\": 41, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 53.4% (ELEVATED)\", \"✅ FOG: LIGHT\", \"⚠️ TAPE: 2/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-28T20:52:12.185798\", \"v2_decision\": null, \"v2_score\": null, \"message\": \"\\nشستا: WATCH (امتیاز: 41)\\n\"}",
         "v2_score": null,
         "v2_decision": null,
         "v2_best_symbol": null
       },
-      "options_snapshot_time": "2026-08-28 17:28:18",
+      "options_snapshot_time": "2026-08-28 20:52:07",
       "options": [
         {
-          "id": 39747,
-          "time": "2026-08-28 17:28:18",
+          "id": 39851,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7050",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3100,8 +3345,8 @@
           "vega": null
         },
         {
-          "id": 39773,
-          "time": "2026-08-28 17:28:18",
+          "id": 39877,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7050",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3119,8 +3364,8 @@
           "vega": null
         },
         {
-          "id": 39748,
-          "time": "2026-08-28 17:28:18",
+          "id": 39852,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7051",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3138,8 +3383,8 @@
           "vega": null
         },
         {
-          "id": 39774,
-          "time": "2026-08-28 17:28:18",
+          "id": 39878,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7051",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3157,8 +3402,8 @@
           "vega": null
         },
         {
-          "id": 39749,
-          "time": "2026-08-28 17:28:18",
+          "id": 39853,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7052",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3176,8 +3421,8 @@
           "vega": null
         },
         {
-          "id": 39760,
-          "time": "2026-08-28 17:28:18",
+          "id": 39864,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8049",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3195,8 +3440,8 @@
           "vega": null
         },
         {
-          "id": 39775,
-          "time": "2026-08-28 17:28:18",
+          "id": 39879,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7052",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3214,8 +3459,8 @@
           "vega": null
         },
         {
-          "id": 39786,
-          "time": "2026-08-28 17:28:18",
+          "id": 39890,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8049",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3233,8 +3478,8 @@
           "vega": null
         },
         {
-          "id": 39750,
-          "time": "2026-08-28 17:28:18",
+          "id": 39854,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7053",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3252,8 +3497,8 @@
           "vega": null
         },
         {
-          "id": 39761,
-          "time": "2026-08-28 17:28:18",
+          "id": 39865,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8050",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3271,8 +3516,8 @@
           "vega": null
         },
         {
-          "id": 39776,
-          "time": "2026-08-28 17:28:18",
+          "id": 39880,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7053",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3290,8 +3535,8 @@
           "vega": null
         },
         {
-          "id": 39787,
-          "time": "2026-08-28 17:28:18",
+          "id": 39891,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8050",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3309,8 +3554,8 @@
           "vega": null
         },
         {
-          "id": 39751,
-          "time": "2026-08-28 17:28:18",
+          "id": 39855,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7054",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3328,8 +3573,8 @@
           "vega": null
         },
         {
-          "id": 39762,
-          "time": "2026-08-28 17:28:18",
+          "id": 39866,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8051",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3347,8 +3592,8 @@
           "vega": null
         },
         {
-          "id": 39777,
-          "time": "2026-08-28 17:28:18",
+          "id": 39881,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7054",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3366,8 +3611,8 @@
           "vega": null
         },
         {
-          "id": 39788,
-          "time": "2026-08-28 17:28:18",
+          "id": 39892,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8051",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3385,8 +3630,8 @@
           "vega": null
         },
         {
-          "id": 39752,
-          "time": "2026-08-28 17:28:18",
+          "id": 39856,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7055",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3404,8 +3649,8 @@
           "vega": null
         },
         {
-          "id": 39763,
-          "time": "2026-08-28 17:28:18",
+          "id": 39867,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8052",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3423,8 +3668,8 @@
           "vega": null
         },
         {
-          "id": 39778,
-          "time": "2026-08-28 17:28:18",
+          "id": 39882,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7055",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3442,8 +3687,8 @@
           "vega": null
         },
         {
-          "id": 39789,
-          "time": "2026-08-28 17:28:18",
+          "id": 39893,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8052",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3461,8 +3706,8 @@
           "vega": null
         },
         {
-          "id": 39753,
-          "time": "2026-08-28 17:28:18",
+          "id": 39857,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7056",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3480,8 +3725,8 @@
           "vega": null
         },
         {
-          "id": 39764,
-          "time": "2026-08-28 17:28:18",
+          "id": 39868,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8053",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3499,8 +3744,8 @@
           "vega": null
         },
         {
-          "id": 39779,
-          "time": "2026-08-28 17:28:18",
+          "id": 39883,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7056",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3518,8 +3763,8 @@
           "vega": null
         },
         {
-          "id": 39790,
-          "time": "2026-08-28 17:28:18",
+          "id": 39894,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8053",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3537,8 +3782,8 @@
           "vega": null
         },
         {
-          "id": 39754,
-          "time": "2026-08-28 17:28:18",
+          "id": 39858,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7057",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3556,8 +3801,8 @@
           "vega": null
         },
         {
-          "id": 39765,
-          "time": "2026-08-28 17:28:18",
+          "id": 39869,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8054",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3575,8 +3820,8 @@
           "vega": null
         },
         {
-          "id": 39780,
-          "time": "2026-08-28 17:28:18",
+          "id": 39884,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7057",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3594,8 +3839,8 @@
           "vega": null
         },
         {
-          "id": 39791,
-          "time": "2026-08-28 17:28:18",
+          "id": 39895,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8054",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3613,8 +3858,8 @@
           "vega": null
         },
         {
-          "id": 39755,
-          "time": "2026-08-28 17:28:18",
+          "id": 39859,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7058",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3632,8 +3877,8 @@
           "vega": null
         },
         {
-          "id": 39766,
-          "time": "2026-08-28 17:28:18",
+          "id": 39870,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8055",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3651,8 +3896,8 @@
           "vega": null
         },
         {
-          "id": 39781,
-          "time": "2026-08-28 17:28:18",
+          "id": 39885,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7058",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3670,8 +3915,8 @@
           "vega": null
         },
         {
-          "id": 39792,
-          "time": "2026-08-28 17:28:18",
+          "id": 39896,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8055",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3689,8 +3934,8 @@
           "vega": null
         },
         {
-          "id": 39756,
-          "time": "2026-08-28 17:28:18",
+          "id": 39860,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7059",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3708,8 +3953,8 @@
           "vega": null
         },
         {
-          "id": 39767,
-          "time": "2026-08-28 17:28:18",
+          "id": 39871,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8056",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3727,8 +3972,8 @@
           "vega": null
         },
         {
-          "id": 39782,
-          "time": "2026-08-28 17:28:18",
+          "id": 39886,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7059",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3746,8 +3991,8 @@
           "vega": null
         },
         {
-          "id": 39793,
-          "time": "2026-08-28 17:28:18",
+          "id": 39897,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8056",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3765,8 +4010,8 @@
           "vega": null
         },
         {
-          "id": 39757,
-          "time": "2026-08-28 17:28:18",
+          "id": 39861,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7060",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3784,8 +4029,8 @@
           "vega": null
         },
         {
-          "id": 39768,
-          "time": "2026-08-28 17:28:18",
+          "id": 39872,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8057",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3803,8 +4048,8 @@
           "vega": null
         },
         {
-          "id": 39783,
-          "time": "2026-08-28 17:28:18",
+          "id": 39887,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7060",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3822,8 +4067,8 @@
           "vega": null
         },
         {
-          "id": 39794,
-          "time": "2026-08-28 17:28:18",
+          "id": 39898,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8057",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3841,8 +4086,8 @@
           "vega": null
         },
         {
-          "id": 39758,
-          "time": "2026-08-28 17:28:18",
+          "id": 39862,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7061",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3860,8 +4105,8 @@
           "vega": null
         },
         {
-          "id": 39769,
-          "time": "2026-08-28 17:28:18",
+          "id": 39873,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8058",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3879,8 +4124,8 @@
           "vega": null
         },
         {
-          "id": 39784,
-          "time": "2026-08-28 17:28:18",
+          "id": 39888,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7061",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3898,8 +4143,8 @@
           "vega": null
         },
         {
-          "id": 39795,
-          "time": "2026-08-28 17:28:18",
+          "id": 39899,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8058",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3917,8 +4162,8 @@
           "vega": null
         },
         {
-          "id": 39759,
-          "time": "2026-08-28 17:28:18",
+          "id": 39863,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا7062",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3936,8 +4181,8 @@
           "vega": null
         },
         {
-          "id": 39770,
-          "time": "2026-08-28 17:28:18",
+          "id": 39874,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8059",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -3955,8 +4200,8 @@
           "vega": null
         },
         {
-          "id": 39785,
-          "time": "2026-08-28 17:28:18",
+          "id": 39889,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا7062",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3974,8 +4219,8 @@
           "vega": null
         },
         {
-          "id": 39796,
-          "time": "2026-08-28 17:28:18",
+          "id": 39900,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8059",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -3993,8 +4238,8 @@
           "vega": null
         },
         {
-          "id": 39771,
-          "time": "2026-08-28 17:28:18",
+          "id": 39875,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8060",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -4012,8 +4257,8 @@
           "vega": null
         },
         {
-          "id": 39797,
-          "time": "2026-08-28 17:28:18",
+          "id": 39901,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8060",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -4031,8 +4276,8 @@
           "vega": null
         },
         {
-          "id": 39772,
-          "time": "2026-08-28 17:28:18",
+          "id": 39876,
+          "time": "2026-08-28 20:52:07",
           "symbol": "ضستا8061",
           "option_type": "CALL",
           "stock_price": 2946.0,
@@ -4050,8 +4295,8 @@
           "vega": null
         },
         {
-          "id": 39798,
-          "time": "2026-08-28 17:28:18",
+          "id": 39902,
+          "time": "2026-08-28 20:52:07",
           "symbol": "طستا8061",
           "option_type": "PUT",
           "stock_price": 2946.0,
@@ -4128,7 +4373,129 @@
           "iv": 0.3781
         }
       ],
-      "v2_analysis": null
+      "v2_analysis": null,
+      "sentiment_v2": {
+        "fear_greed": {
+          "fear_greed": 71.0,
+          "level": "GREED",
+          "opportunity": "احتیاط - طمع",
+          "breakdown": [
+            "pc: EXTREME GREED Score 90 Weight 30.0%",
+            "money_flow: NEUTRAL Score 50 Weight 25.0%",
+            "order_book: EXTREME GREED - صف خرید قفل‌شده Score 95 Weight 20.0%",
+            "bpi: NEUTRAL Score 50 Weight 15.0%",
+            "news: NEUTRAL Score 50 Weight 10.0%"
+          ],
+          "weights": {
+            "pc": 0.3,
+            "money_flow": 0.25,
+            "order_book": 0.2,
+            "bpi": 0.15,
+            "news": 0.1
+          }
+        },
+        "iran_vix": {
+          "vix": 39.5,
+          "level": "GREED",
+          "source": "IV_HISTORY_DB"
+        },
+        "put_call_ratio": {
+          "pc_volume": 0.13,
+          "pc_oi": 0.07,
+          "pc_combined": 0.07,
+          "sentiment": "EXTREME GREED",
+          "score": 90
+        },
+        "money_flow": {
+          "retail_net": null,
+          "institutional_net": null,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "order_book": {
+          "imbalance_pct": null,
+          "pressure": "BUY_QUEUE",
+          "market_state": "LOCKED_BUY_QUEUE",
+          "sentiment": "EXTREME GREED - صف خرید قفل‌شده",
+          "score": 95
+        },
+        "bpi": {
+          "bpi_pct": null,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "news": {
+          "news_count": 0,
+          "sentiment_score": 0,
+          "sentiment": "NEUTRAL",
+          "score": 50
+        },
+        "high_low": {
+          "high_52w_count": null,
+          "low_52w_count": null,
+          "high_low_ratio": null,
+          "sentiment": "NEUTRAL - نیاز به داده کل بازار TSETMC",
+          "score": 50,
+          "note": "برای پیاده‌سازی کامل باید از TSETMC تعداد نمادهای سقف/کف 52 هفته گرفت - فعلا پروکسی"
+        },
+        "components": {
+          "pc": {
+            "pc_volume": 0.13,
+            "pc_oi": 0.07,
+            "pc_combined": 0.07,
+            "sentiment": "EXTREME GREED",
+            "score": 90
+          },
+          "money_flow": {
+            "retail_net": null,
+            "institutional_net": null,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "order_book": {
+            "imbalance_pct": null,
+            "pressure": "BUY_QUEUE",
+            "market_state": "LOCKED_BUY_QUEUE",
+            "sentiment": "EXTREME GREED - صف خرید قفل‌شده",
+            "score": 95
+          },
+          "bpi": {
+            "bpi_pct": null,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "news": {
+            "news_count": 0,
+            "sentiment_score": 0,
+            "sentiment": "NEUTRAL",
+            "score": 50
+          },
+          "high_low": {
+            "high_52w_count": null,
+            "low_52w_count": null,
+            "high_low_ratio": null,
+            "sentiment": "NEUTRAL - نیاز به داده کل بازار TSETMC",
+            "score": 50,
+            "note": "برای پیاده‌سازی کامل باید از TSETMC تعداد نمادهای سقف/کف 52 هفته گرفت - فعلا پروکسی"
+          },
+          "vix": {
+            "vix": 39.5,
+            "level": "GREED",
+            "source": "IV_HISTORY_DB"
+          }
+        },
+        "risks": [
+          "P/C OI پایین 0.07 - همه کال می‌خرن - سقف نزدیک",
+          "صف خرید قفل‌شده - طمع شدید - مراقب تله حقوقی باش"
+        ],
+        "opportunities": [],
+        "timestamp": "2026-08-28T20:59:31.964093"
+      },
+      "order_book": {
+        "market_state": "LOCKED_BUY_QUEUE",
+        "pressure": "BUY_QUEUE",
+        "imbalance_pct": null
+      }
     }
   }
 }
