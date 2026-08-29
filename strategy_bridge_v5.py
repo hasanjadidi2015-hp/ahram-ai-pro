@@ -10,6 +10,13 @@ import sqlite3
 from datetime import datetime
 
 DATABASES = {
+    # V5 Shadow - DB جدا، هیچ تداخلی با V4 اصلی ندارد
+    "اهرم": "ahram_v2_v5.db",
+    "وبملت": "webmellt_v5.db",
+    "شستا": "shasta_v5.db",
+}
+# Fallback به DB اصلی اگر V5 وجود نداشت (برای نمایش اولیه)
+DATABASES_FALLBACK = {
     "اهرم": "ahram_v2.db",
     "وبملت": "webmellt.db",
     "شستا": "shasta.db",
@@ -193,8 +200,14 @@ def calculate_chain_metrics(options, stock_price):
     }
 
 def build_symbol_data(name, db_path):
+    # Fallback به DB اصلی اگر V5 هنوز ساخته نشده
+    original_path = db_path
     if not os.path.exists(db_path):
-        return {"database": db_path, "available": False, "reason": "file not found"}
+        fallback = DATABASES_FALLBACK.get(name)
+        if fallback and os.path.exists(fallback):
+            db_path = fallback
+        else:
+            return {"database": original_path, "available": False, "reason": "file not found"}
     connection = sqlite3.connect(db_path)
     try:
         try:
@@ -235,6 +248,41 @@ def build_symbol_data(name, db_path):
         v2_analysis = None
         if signal and signal.get("details"):
             v2_analysis = get_v2_analysis_from_details(signal["details"])
+
+        # VACE - محاسبه زنده
+        vace_data = None
+        try:
+            from vace_engine_v2 import analyze_vace
+            # ADX فعلی
+            adx_cur = None
+            try:
+                import pandas as pd
+                df_price = pd.read_sql("SELECT last_price FROM prices ORDER BY id", connection)
+                if len(df_price) >= 28:
+                    from adx import ADX
+                    adx_c = ADX(df_price)
+                    adx_c.calculate()
+                    adx_cur = adx_c.adx_value
+            except:
+                pass
+            # Fibo
+            fib_det = None
+            try:
+                import pandas as pd
+                df_price = pd.read_sql("SELECT last_price FROM prices ORDER BY id", connection)
+                if len(df_price) >= 20:
+                    from fibonacci import Fibonacci
+                    fib_c = Fibonacci(df_price)
+                    fib_c.calculate()
+                    fib_det = fib_c.details
+                    fib_det["levels"] = fib_c.levels
+                    fib_det["trend"] = fib_c.trend
+            except:
+                pass
+            curr_price = stock_price
+            vace_data = analyze_vace(db_path=db_path, current_adx=adx_cur, fib_details=fib_det, current_price=curr_price)
+        except Exception as e:
+            print(f"[WARN] {name}: VACE - {e}")
 
         # Sentiment V2 - محاسبه زنده
         sentiment_v2 = None
@@ -282,7 +330,8 @@ def build_symbol_data(name, db_path):
             "max_pain": max_pain,
             "iv_history": iv_hist,
             "v2_analysis": v2_analysis,
-            "sentiment_v2": sentiment_v2,  # جدید
+            "sentiment_v2": sentiment_v2,
+            "vace": vace_data,
             "order_book": order_book,
         }
     except Exception as e:
@@ -302,7 +351,7 @@ def build_payload():
         "signals_modified": False,
         "v2_enabled": True,
         "sentiment_enabled": True,
-        "v2_modules": ["greek_engine_v2", "iv_engine_v2", "risk_engine_v2", "contract_scoring_engine_v2", "decision_engine_v2", "sentiment_engine_v2"],
+        "v2_modules": ["greek_engine_v2", "iv_engine_v2", "risk_engine_v2", "contract_scoring_engine_v2", "decision_engine_v2", "sentiment_engine_v2", "vace_engine_v2"],
         "symbols": {name: build_symbol_data(name, db_path) for name, db_path in DATABASES.items()},
     }
 
@@ -324,7 +373,10 @@ def main():
         sent = data.get("sentiment_v2")
         fg = sent.get("fear_greed", {}).get("fear_greed") if sent else None
         fg_level = sent.get("fear_greed", {}).get("level") if sent else None
-        print(f"{name}: options={opt_count} | V2 Score={v2_score} | Fear&Greed={fg} {fg_level}")
+        vace = data.get("vace", {})
+        atr_f = vace.get("atr_factor", {}).get("atr_factor") if vace else None
+        adx_thr = vace.get("dynamic_adx", {}).get("threshold") if vace else None
+        print(f"{name}: options={opt_count} | V2 Score={v2_score} | Fear&Greed={fg} {fg_level} | VACE ADX {adx_thr} ATR×{atr_f}")
 
 if __name__ == "__main__":
     main()

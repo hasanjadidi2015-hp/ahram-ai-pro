@@ -46,6 +46,7 @@ def make_v5_panel(payload):
         signal = data.get("signal") or {}
         v2 = data.get("v2_analysis") or {}
         sentiment = data.get("sentiment_v2") or {}
+        vace = data.get("vace") or {}
         max_pain = data.get("max_pain") or []
         latest_mp = max_pain[0] if max_pain else {}
         signal_type = signal.get("signal_type") or "—"
@@ -88,7 +89,6 @@ def make_v5_panel(payload):
 
         sentiment_html = ""
         if fg_val is not None:
-            # رنگ بر اساس Fear & Greed
             fg_color = "#22c55e" if fg_val <= 20 else ("#f59e0b" if fg_val >= 80 else "#a78bfa")
             sentiment_html = f'''
             <div style="margin:8px 0;padding:10px;background:linear-gradient(90deg,#1e1b4b,#0f172a);border:1px solid {fg_color};border-radius:10px">
@@ -100,6 +100,29 @@ def make_v5_panel(payload):
                 Iran VIX: {fmt(vix_val)}% · P/C OI: {fmt(pc.get('pc_oi'))} Vol: {fmt(pc.get('pc_volume'))} · {escape(str(pc.get('sentiment','')))}<br>
                 Order: {escape(str(order_book.get('market_state','')))} {fmt(order_book.get('imbalance_pct'))}% {escape(str(order_book.get('pressure','')))}<br>
                 {escape(str(fg_opp))}
+              </div>
+            </div>
+            '''
+
+        # VACE
+        vace_html = ""
+        if vace:
+            dyn_adx = vace.get("dynamic_adx", {})
+            atr_f = vace.get("atr_factor", {})
+            auto_sl = vace.get("auto_sl", {})
+            fibo_f = vace.get("fibo_filter", {})
+            vace_color = "#f59e0b" if not vace.get("confluence_ok") else "#10b981"
+            vace_html = f'''
+            <div style="margin:8px 0;padding:10px;background:linear-gradient(90deg,#1a1a2e,#0f172a);border:1px solid {vace_color};border-radius:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <b style="color:{vace_color}">🔬 VACE: ADX {fmt(dyn_adx.get('threshold'))} ATR×{fmt(atr_f.get('atr_factor'))} SL {fmt(auto_sl.get('sl_pct'))}%</b>
+                <span style="background:{vace_color};color:#000;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:bold">{escape(str(fibo_f.get('zone','')))} {'✅' if vace.get('confluence_ok') else '⛔'}</span>
+              </div>
+              <div style="margin-top:6px;font-size:11px;color:#cbd5e1">
+                ADX: {fmt(dyn_adx.get('current_adx'))} vs {fmt(dyn_adx.get('threshold'))} {'Trending' if dyn_adx.get('is_trending') else 'Ranging'} ({dyn_adx.get('history_count',0)} روز)<br>
+                Vol Ratio: {fmt(atr_f.get('vol_ratio'))} Adj: {fmt(atr_f.get('vol_adj'))} → Factor {fmt(atr_f.get('atr_factor'))}<br>
+                Fibo: {escape(str(fibo_f.get('reason',''))[:80])}<br>
+                {escape(str(vace.get('summary',''))[:120])}
               </div>
             </div>
             '''
@@ -123,6 +146,7 @@ def make_v5_panel(payload):
           <div style="border-top:1px solid #334155;padding:8px 0;color:#b6c4d8;font-size:12px">امتیاز قدیمی <b style="float:left;color:#f8fafc">{fmt(score)}</b></div>
           <div style="border-top:1px solid #334155;padding:8px 0;color:#a78bfa;font-size:12px">🔬 CALL SCORE V2 <b style="float:left;color:#a78bfa">{fmt(v2_score)}/100</b> · {escape(str(v2_dec))} · {escape(str(v2_best))}</div>
           {sentiment_html}
+          {vace_html}
           {breakdown_html}
           {risks_html}
           <div style="border-top:1px solid #334155;padding:8px 0;color:#b6c4d8;font-size:12px">زنجیره <b style="float:left;color:#f8fafc">{options_count} قرارداد</b></div>
@@ -139,12 +163,12 @@ def make_v5_panel(payload):
     return f'''
     <div id="ahram-bridge-panel-v5" dir="rtl" style="margin:24px auto;padding:20px;max-width:1440px;background:linear-gradient(180deg,#1e1b4b,#111c2e);border:1px solid #4c1d95;border-radius:18px;color:#edf3ff;font-family:Tahoma,Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px solid #4c1d95;padding-bottom:14px;margin-bottom:14px">
-        <div><h2 style="margin:0 0 5px;font-size:19px;color:#a78bfa">🔬 AHRAM AI PRO V5 - Option Decision + Sentiment</h2>
-        <p style="margin:0;color:#94a3b8;font-size:12px">Greek V2 + IV V2 + Risk V2 + Scoring V2 + Decision V2 + Sentiment V2 (Fear & Greed Iran) · فقط‌خواندنی</p></div>
-        <span style="background:#4c1d95;color:#c4b5fd;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:bold">V5 + SENTIMENT</span>
+        <div><h2 style="margin:0 0 5px;font-size:19px;color:#a78bfa">🔬 AHRAM AI PRO V5 - Option Decision + Sentiment + VACE</h2>
+        <p style="margin:0;color:#94a3b8;font-size:12px">Greek V2 + IV V2 + Risk V2 + Scoring V2 + Decision V2 + Sentiment V2 + VACE (ADX Dyn + ATR Dyn + Fibo No-Trade + Break-Even) · SHADOW MODE</p></div>
+        <span style="background:#4c1d95;color:#c4b5fd;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:bold">V5 + VACE SHADOW</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">{"".join(cards)}</div>
-      <div style="margin-top:14px;padding:11px;background:#1e1b4b;color:#c4b5fd;border:1px solid #4c1d95;border-radius:10px;font-size:12px">V5 + Sentiment: Fear & Greed Iran = P/C 30% + Money Flow 25% + Order Book 20% + BPI 15% + News 10% - 0-20 ترس شدید فرصت خرید، 80-100 طمع شدید هشدار سقف. زنجیره مثل قبل کار می‌کند.</div>
+      <div style="margin-top:14px;padding:11px;background:#1e1b4b;color:#c4b5fd;border:1px solid #4c1d95;border-radius:10px;font-size:12px">V5 + VACE: ADX Dyn = Percentile_50(ADX,300) - ATR Factor = 3.8+0.8*VolAdj - SL Auto = -3.5*SMA(ATRpct,50) bounded -5%..-20% - Fibo Mid Zone 38.2-61.8% No Trade - Break-Even 8.5% - Tiered TP 30/30/40% - SHADOW MODE بدون اثر روی V4</div>
       <script id="ahram-bridge-data-v5">window.AHRAM_BRIDGE_DATA_V5 = {payload_json};</script>
       <script id="ahram-chain-loader-v5">
       window.addEventListener("DOMContentLoaded", function () {{
@@ -179,9 +203,9 @@ def make_v5_panel(payload):
             if (typeof buildAllStrategies === 'function') buildAllStrategies();
             if (typeof renderAllPages === 'function') renderAllPages();
             if (typeof renderSymbolDive === 'function') renderSymbolDive();
-            if (typeof showToast === 'function') showToast("✅ AHRAM V5 + Sentiment: 6 موتور + زنجیره واقعی بارگذاری شد");
+            if (typeof showToast === 'function') showToast("✅ AHRAM V5 + VACE: 7 موتور + زنجیره واقعی بارگذاری شد");
           }}
-          console.log("AHRAM V5 + Sentiment Data:", data);
+          console.log("AHRAM V5 + VACE Data:", data);
         }} catch (err) {{ console.warn("AHRAM V5 loader:", err); }}
       }});
       </script>

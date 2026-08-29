@@ -110,13 +110,23 @@ except Exception as _e:
     _HAS_SENTIMENT_V2 = False
     print(f"[WARN] sentiment_engine_v2 بارگذاری نشد: {_e}")
 
+try:
+    from vace_engine_v2 import analyze_vace, calculate_tiered_tp, check_break_even
+    _HAS_VACE_V2 = True
+    print(f"[OK] vace_engine_v2 بارگذاری شد")
+except Exception as _e:
+    analyze_vace = calculate_tiered_tp = check_break_even = None
+    _HAS_VACE_V2 = False
+    print(f"[WARN] vace_engine_v2 بارگذاری نشد: {_e}")
+
 CONFIG = {
     "version": "5.0",
-    "name": "AHRAM AI PRO V5",
+    "name": "AHRAM AI PRO V5 - SHADOW MODE",
     "symbols": [
-        {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db", "option_root": "هرم", "queue_gap": 4.0},
-        {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db", "option_root": "ملت", "queue_gap": 7.0},
-        {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db", "option_root": "ستا", "queue_gap": 7.0},
+        # DB جدا برای V5 - هیچ تداخلی با V4.1 ندارد (ahram_v2.db اصلی دست نمی‌خورد)
+        {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2_v5.db", "option_root": "هرم", "queue_gap": 4.0},
+        {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt_v5.db", "option_root": "ملت", "queue_gap": 7.0},
+        {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta_v5.db", "option_root": "ستا", "queue_gap": 7.0},
     ],
     "market_open": dtime(9, 0),
     "market_close": dtime(12, 30),
@@ -129,11 +139,13 @@ CONFIG = {
     "max_position_hold_hours": 3,
     "risk_per_trade": 0.05,
     "capital": 100_000_000,
-    "telegram_enabled": True,
-    "desktop_enabled": True,
+    # V5 در حالت SHADOW - هیچ نوتیفیکیشن واقعی نمی‌فرسته، فقط لاگ
+    "telegram_enabled": False,
+    "desktop_enabled": False,
     "dashboard_enabled": True,
-    "v2_enabled": True,  # فعال‌سازی سیستم جدید (فقط نمایش، روی سیگنال قدیمی اثر نداره تا بک‌تست)
-    "v2_min_score": 45,  # حداقل امتیاز V2 برای BUY
+    "v2_enabled": True,
+    "v2_min_score": 45,
+    "shadow_mode": True,  # الگوی shadow_strategy.py - فقط محاسبه و لاگ، بدون اثر روی DB اصلی
 }
 
 
@@ -363,6 +375,53 @@ def analyze_technicals(symbol_config):
     if result["price"] <= 0 and result["action"] != "WATCH":
         state.log(f"  ⚠️ قیمت نامعتبر ({result['price']}) با اکشن {result['action']} -> اجباری WATCH", "WARN")
         result["action"] = "WATCH"
+
+    # ===== VACE Auto-Calibration - فقط V5 Shadow =====
+    if CONFIG.get("v2_enabled") and _HAS_VACE_V2 and CONFIG.get("shadow_mode"):
+        try:
+            # محاسبه ADX فعلی از df
+            adx_current = None
+            try:
+                import pandas as pd
+                import sqlite3
+                conn = sqlite3.connect(db)
+                df = pd.read_sql("SELECT last_price FROM prices ORDER BY id", conn)
+                conn.close()
+                if len(df) >= 28:
+                    from adx import ADX
+                    adx_calc = ADX(df)
+                    adx_calc.calculate()
+                    adx_current = adx_calc.adx_value
+            except Exception as _e:
+                pass
+
+            # ATR از HV
+            atr_val = None
+            try:
+                hv = result.get("indicators", {}).get("hv") or 0
+                # تخمین ATR از HV * قیمت
+                if result["price"] > 0 and hv:
+                    atr_val = float(result["price"]) * float(hv) / 100 * 0.1  # تخمین
+            except:
+                pass
+
+            # Fibonacci details اگر موجود باشد
+            fib_details = result.get("indicators", {}).get("fibonacci")
+
+            vace_analysis = analyze_vace(
+                db_path=db,
+                current_adx=adx_current,
+                atr=atr_val,
+                close_price=result["price"],
+                fib_details=fib_details,
+                current_price=result["price"]
+            )
+            result["vace"] = vace_analysis
+            state.log(f"  🔬 VACE: {vace_analysis['summary']}")
+            if not vace_analysis["confluence_ok"]:
+                state.log(f"  ⚠️ VACE No-Trade: {vace_analysis['fibo_filter']['reason']}", "WARN")
+        except Exception as e:
+            state.log(f"  ⚠️ خطا VACE: {e}", "WARN")
 
     return result
 
@@ -663,6 +722,8 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         "fog_ok": False,
         "tape_ok": False,
         "market_ok": False,
+        "vace_adx_ok": True,  # VACE جدید
+        "vace_fibo_ok": True,
     }
 
     reasons = []
@@ -726,6 +787,30 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         else:
             reasons.append(f"⚠️ حجم: خنثی")
 
+    # VACE Filters - فقط V5 Shadow، روی سیگنال قدیمی اثر ندارد تا بک‌تست (فقط لاگ)
+    vace_data = technicals.get("vace") if isinstance(technicals, dict) else None
+    if vace_data:
+        # ADX Dynamic
+        dyn_adx = vace_data.get("dynamic_adx", {})
+        if dyn_adx.get("is_trending") is False:
+            checks["vace_adx_ok"] = False
+            reasons.append(f"⚠️ VACE ADX: روند ضعیف (ADX {dyn_adx.get('current_adx')} < threshold {dyn_adx.get('threshold')}) - اکتشافی")
+        else:
+            checks["vace_adx_ok"] = True
+            reasons.append(f"✅ VACE ADX: روند قوی (ADX {dyn_adx.get('current_adx')} > {dyn_adx.get('threshold')})")
+        
+        # Fibo No-Trade Zone
+        fibo_f = vace_data.get("fibo_filter", {})
+        if not fibo_f.get("allow_entry", True):
+            checks["vace_fibo_ok"] = False
+            reasons.append(f"❌ VACE Fibo: {fibo_f.get('reason')} - اکتشافی (روی قدیمی اثر ندارد)")
+        else:
+            checks["vace_fibo_ok"] = True
+            if fibo_f.get("zone") == "SHALLOW_ZONE":
+                reasons.append(f"⚠️ VACE Fibo: زون کم‌عمق - TP1 روی 38.2% - اکتشافی")
+            else:
+                reasons.append(f"✅ VACE Fibo: {fibo_f.get('zone')} - مجاز")
+
     indices = market_data.get("indices")
     money_flow = market_data.get("money_flow")
     if indices or money_flow:
@@ -780,7 +865,9 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     }
 
     if signal_type in ("BUY_CALL", "BUY_PUT") and option:
-        targets = _calculate_targets(option, signal_type)
+        # VACE data برای targets
+        vace_for_targets = technicals.get("vace") if isinstance(technicals, dict) else None
+        targets = _calculate_targets(option, signal_type, vace_data=vace_for_targets, technicals=technicals)
         signal["targets"] = targets
         signal["message"] = _format_signal_message(signal, name)
     else:
@@ -822,17 +909,78 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     return signal
 
 
-def _calculate_targets(option, signal_type):
+def _calculate_targets(option, signal_type, vace_data=None, technicals=None):
     entry = float(option.get("option_price", 0))
     dte = int(option.get("days_to_expire", 30))
     if entry <= 0:
         return None
-    if dte <= 7:
-        sl_pct = 0.10
-    elif dte <= 21:
-        sl_pct = 0.12
-    else:
-        sl_pct = 0.15
+
+    # VACE Auto SL و ATR Factor - اگر موجود باشد
+    sl_pct = None
+    atr_factor = 3.8
+    tp1_override_price = None
+
+    if vace_data:
+        # Auto SL از VACE
+        auto_sl = vace_data.get("auto_sl", {})
+        if auto_sl and auto_sl.get("sl_pct"):
+            sl_pct = abs(auto_sl["sl_pct"]) / 100.0
+        
+        # ATR Factor
+        atr_f = vace_data.get("atr_factor", {})
+        if atr_f and atr_f.get("atr_factor"):
+            atr_factor = atr_f["atr_factor"]
+        
+        # Fibo TP1 override
+        fibo_f = vace_data.get("fibo_filter", {})
+        if fibo_f and fibo_f.get("tp1_override"):
+            tp1_override_price = fibo_f["tp1_override"]
+
+    # Fallback به منطق قدیمی اگر VACE موجود نبود
+    if sl_pct is None:
+        if dte <= 7:
+            sl_pct = 0.10
+        elif dte <= 21:
+            sl_pct = 0.12
+        else:
+            sl_pct = 0.15
+
+    # Tiered TP با ATR Factor داینامیک (VACE)
+    # تخمین ATR از قیمت آپشن
+    atr_value = entry * 0.04 * atr_factor  # تخمین اولیه
+    
+    if vace_data and calculate_tiered_tp:
+        try:
+            tiered = calculate_tiered_tp(entry, atr_value, atr_factor, option.get("option_type", "CALL"))
+            if tiered:
+                # اگر TP1 override از فیبو داریم
+                t1_price = tiered["tp1"]
+                if tp1_override_price:
+                    # TP1 روی سطح 38.2% فیبو (تبدیل به قیمت آپشن - تخمین)
+                    # برای سادگی: TP1 override فقط برای نمایش، محاسبه دقیق نیاز به قیمت سهم دارد
+                    pass
+                
+                return {
+                    "entry": round(entry),
+                    "stop_loss": round(entry * (1 - sl_pct)),
+                    "stop_loss_pct": round(sl_pct * 100),
+                    "target1": tiered["tp1"],
+                    "target1_pct": tiered["tp1_pct"],
+                    "target1_close_pct": tiered["tp1_close_pct"],
+                    "target2": tiered["tp2"],
+                    "target2_pct": tiered["tp2_pct"],
+                    "target2_close_pct": tiered["tp2_close_pct"],
+                    "target3": tiered["tp3"],
+                    "target3_pct": tiered["tp3_pct"],
+                    "target3_close_pct": tiered["tp3_close_pct"],
+                    "atr_factor": atr_factor,
+                    "vace_method": "tiered_tp",
+                    "tp1_override": tp1_override_price
+                }
+        except Exception as e:
+            pass
+
+    # Fallback قدیمی
     t1_pct = 0.15
     t2_pct = 0.30
     return {
@@ -843,6 +991,8 @@ def _calculate_targets(option, signal_type):
         "target1_pct": round(t1_pct * 100),
         "target2": round(entry * (1 + t2_pct)),
         "target2_pct": round(t2_pct * 100),
+        "atr_factor": atr_factor,
+        "vace_method": "fallback_old"
     }
 
 
@@ -883,6 +1033,11 @@ def _format_signal_message(signal, symbol_name):
 
 
 def send_notification(signal, symbol_name):
+    # V5 SHADOW - هیچ نوتیف واقعی نمی‌فرسته
+    if CONFIG.get("shadow_mode"):
+        if signal["type"] != "WATCH":
+            state.log(f"  🔬 [V5 SHADOW] {signal['type']} {symbol_name} - فقط لاگ", "INFO")
+        return
     if signal["type"] == "WATCH":
         return
     message = signal.get("message", "")
@@ -1037,13 +1192,34 @@ def check_live_exits_for_symbol(name, db):
             sl_f = float(sl) if sl else None
             t1_f = float(t1) if t1 else None
             t2_f = float(t2) if t2 else None
+            
+            # محاسبه PnL
+            pnl_pct = ((cur_price - entry_f) / entry_f) * 100 if entry_f > 0 else 0
+            
             new_outcome = None
+            
+            # VACE Break-Even: اگر PnL >= 8.5%، SL به قیمت ورود منتقل می‌شود (Risk-Free)
+            if _HAS_VACE_V2 and check_break_even and outcome == "PENDING":
+                try:
+                    if check_break_even(pnl_pct, be_threshold=8.5):
+                        # SL را به entry منتقل کن - فقط اگر SL فعلی پایین‌تر از entry است
+                        if sl_f and sl_f < entry_f:
+                            cur.execute(
+                                "UPDATE signal_history SET stop_loss=? WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
+                                (entry_f, pos_id)
+                            )
+                            state.log(f"  🔬 VACE Break-Even: {sym} PnL {pnl_pct:.1f}% >= 8.5% -> SL به {entry_f:.0f} (Risk-Free)", "INFO")
+                            sl_f = entry_f  # آپدیت برای چک بعدی
+                except Exception as _be_e:
+                    pass
+            
             if sl_f and cur_price <= sl_f:
                 new_outcome = "LOSS"
             elif t2_f and cur_price >= t2_f:
                 new_outcome = "WIN"
             elif t1_f and cur_price >= t1_f and outcome == "PENDING":
                 new_outcome = "T1_HIT"
+            
             if new_outcome and new_outcome != outcome:
                 pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
                 cur.execute(
@@ -1209,7 +1385,7 @@ def run():
     print(f"📊 نمادها: {', '.join(s['name'] for s in CONFIG['symbols'])}")
     print(f"⏰ ساعات: {CONFIG['market_open']} - {CONFIG['market_close']}")
     print(f"🔄 سیکل: هر {CONFIG['cycle_seconds']} ثانیه")
-    print(f"🔬 V2 Enabled: {CONFIG['v2_enabled']} | Greek V2: {_HAS_GREEK_V2} | IV V2: {_HAS_IV_V2} | Risk V2: {_HAS_RISK_V2} | Scoring V2: {_HAS_SCORING_V2} | Decision V2: {_HAS_DECISION_V2} | Sentiment V2: {_HAS_SENTIMENT_V2}")
+    print(f"🔬 V2 Enabled: {CONFIG['v2_enabled']} | Greek V2: {_HAS_GREEK_V2} | IV V2: {_HAS_IV_V2} | Risk V2: {_HAS_RISK_V2} | Scoring V2: {_HAS_SCORING_V2} | Decision V2: {_HAS_DECISION_V2} | Sentiment V2: {_HAS_SENTIMENT_V2} | VACE V2: {_HAS_VACE_V2}")
     print()
 
     while True:
