@@ -64,8 +64,12 @@ try:
     from iv_engine_v2 import analyze_iv as analyze_iv_v2, record_daily_iv as record_daily_iv_v2
     try:
         from iv_engine_v2 import record_skew as record_skew_v2
-    except:
-        from iv_engine_v2 import record_skew_history as record_skew_v2
+    except Exception as _e:
+        try:
+            from iv_engine_v2 import record_skew_history as record_skew_v2
+        except Exception as _e2:
+            record_skew_v2 = None
+            print(f"[WARN] نه record_skew نه record_skew_history پیدا شد: {_e2}")
     _HAS_IV_V2 = True
     print(f"[OK] iv_engine_v2 بارگذاری شد")
 except Exception as _e:
@@ -112,10 +116,15 @@ except Exception as _e:
 CONFIG = {
     "version": "5.0",
     "name": "AHRAM AI PRO V5",
+    # ⚠️ عمداً از دیتابیس‌های v1 جداست (پسوند _v5). تا وقتی این موتور اثبات
+    # نشده، نباید داده‌اش با سیگنال‌ها/پوزیشن‌های واقعی v1 قاطی بشه --
+    # اگه همین db های v1 (ahram_v2.db و...) رو اینجا بذاری، سیگنال‌ها و
+    # هشدارهای این موتور مستقیم با v1 قاطی می‌شن (چون هر دو تو همون
+    # signal_history با همون position_id می‌نویسن).
     "symbols": [
-        {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db", "option_root": "هرم", "queue_gap": 4.0},
-        {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db", "option_root": "ملت", "queue_gap": 7.0},
-        {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db", "option_root": "ستا", "queue_gap": 7.0},
+        {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2_v5.db", "option_root": "هرم", "queue_gap": 4.0},
+        {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt_v5.db", "option_root": "ملت", "queue_gap": 7.0},
+        {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta_v5.db", "option_root": "ستا", "queue_gap": 7.0},
     ],
     "market_open": dtime(9, 0),
     "market_close": dtime(12, 30),
@@ -133,6 +142,10 @@ CONFIG = {
     "dashboard_enabled": True,
     "v2_enabled": True,  # فعال‌سازی سیستم جدید (فقط نمایش، روی سیگنال قدیمی اثر نداره تا بک‌تست)
     "v2_min_score": 45,  # حداقل امتیاز V2 برای BUY
+    # دوره‌ی آزمایشی: نوتیفیکیشن‌ها همچنان فعالن ولی با برچسب واضح "[آزمایشی V5]"
+    # تا با هشدارهای واقعی v1 اشتباه گرفته نشن. اگه اصلاً نمی‌خوای مزاحم بشه،
+    # این رو False کن -- سیگنال‌ها همچنان توی db_v5 و لاگ ثبت می‌شن.
+    "v5_trial_notifications": True,
 }
 
 
@@ -511,8 +524,8 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
                 from order_book import collect_order_book as _ob_collect
                 # این فقط برای تست - در اجرای اصلی market_data از بالا میاد
                 pass
-            except:
-                pass
+            except Exception as _e:
+                state.log(f"  ⚠️ خطا جمع‌آوری داده‌ی sentiment (money_flow/order_book): {_e}", "WARN")
             # برای الان: از فایل‌های JSON اگر موجود باشن
             # در analyze_symbol، market_data را به analyze_options پاس نمی‌دهیم، پس اینجا فقط با DB کار می‌کنیم
             # sentiment را با داده‌های موجود از result می‌سازیم
@@ -884,8 +897,11 @@ def _format_signal_message(signal, symbol_name):
 def send_notification(signal, symbol_name):
     if signal["type"] == "WATCH":
         return
+    if not CONFIG.get("v5_trial_notifications", True):
+        state.log("  ℹ️ نوتیفیکیشن V5 غیرفعاله (v5_trial_notifications=False) -- فقط توی دیتابیس ثبت شد")
+        return
     message = signal.get("message", "")
-    title = f"AHRAM AI - {signal['type']} {symbol_name}"
+    title = f"[آزمایشی V5] AHRAM AI - {signal['type']} {symbol_name}"
     if CONFIG["telegram_enabled"]:
         try:
             telegram = get_module("telegram")
