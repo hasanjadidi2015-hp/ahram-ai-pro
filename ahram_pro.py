@@ -838,6 +838,30 @@ def check_live_exits_for_symbol(name, db):
         send_notification({"type": "EXIT", "message": msg}, name)
 
 
+def _count_total_open_positions():
+    """تعداد واقعی پوزیشن‌های باز (position_id یکتا با outcome PENDING/T1_HIT)
+    در کل سه دیتابیس -- state.open_positions فقط برای جلوگیری از
+    نوتیفیکیشن تکراریه (حداکثر یه ورودی به‌ازای هر نماد)، نه شمارش واقعی
+    ریسک باز؛ چون وقتی cooldown تموم بشه و قرارداد جدیدی برای همون نماد
+    انتخاب بشه، رکورد قرارداد قبلی توی state بی‌صدا بازنویسی می‌شه، در حالی
+    که توی دیتابیس همچنان PENDING مونده. برای کنترل واقعی ریسک، باید از
+    دیتابیس شمرد، نه از حافظه."""
+    total = 0
+    for sym in CONFIG["symbols"]:
+        try:
+            conn = sqlite3.connect(sym["db"])
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT COUNT(DISTINCT position_id) FROM signal_history "
+                "WHERE outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL"
+            )
+            total += cur.fetchone()[0] or 0
+            conn.close()
+        except Exception:
+            continue
+    return total
+
+
 def analyze_symbol(symbol_config):
     name = symbol_config["name"]
     db = symbol_config["db"]
@@ -884,7 +908,7 @@ def analyze_symbol(symbol_config):
                 f"  ℹ️ سیگنال {direction} تکراریه (پوزیشن از {existing['since'].strftime('%H:%M')} "
                 f"باز فرض می‌شه) -> نوتیفیکیشن دوباره ارسال نشد", "INFO"
             )
-        elif name not in state.open_positions and len(state.open_positions) >= CONFIG["max_positions"]:
+        elif name not in state.open_positions and _count_total_open_positions() >= CONFIG["max_positions"]:
             state.log(
                 f"  ⚠️ به سقف {CONFIG['max_positions']} پوزیشن هم‌زمان رسیدیم -> "
                 f"نوتیفیکیشن {direction} برای {name} ارسال نشد", "WARN"
