@@ -359,6 +359,37 @@ def analyze_technicals(symbol_config):
         if Strategy:
             strategy = Strategy(db_path=db)
             analysis = strategy.analyze()
+            # ===== فیکس باگ: fib و adx و ... واقعاً کجاست - از خود strategy object بخون =====
+            try:
+                fib_obj = getattr(strategy, 'fib', None)
+                if fib_obj:
+                    result["indicators"]["fibonacci"] = {
+                        "details": getattr(fib_obj, 'details', {}),
+                        "levels": getattr(fib_obj, 'levels', {}),
+                        "trend": getattr(fib_obj, 'trend', 'UNKNOWN'),
+                        "zone": getattr(fib_obj, 'current_zone', 'UNKNOWN'),
+                        "strength": getattr(fib_obj, 'strength', 50),
+                        "support": getattr(fib_obj, 'nearest_support', None),
+                        "resistance": getattr(fib_obj, 'nearest_resistance', None)
+                    }
+                    # برای سازگاری با کد قدیمی که levels جدا می‌خواست
+                    result["indicators"]["fibonacci"]["levels"] = fib_obj.levels
+                adx_obj = getattr(strategy, 'adx_obj', None)
+                if adx_obj:
+                    result["indicators"]["adx"] = {
+                        "value": getattr(adx_obj, 'adx_value', 0),
+                        "strength": getattr(adx_obj, 'strength', 50)
+                    }
+                ema_obj = getattr(strategy, 'ema_obj', None)
+                if ema_obj:
+                    result["indicators"]["ema"] = {"strength": getattr(ema_obj, 'strength', 50)}
+                macd_obj = getattr(strategy, 'macd_obj', None)
+                if macd_obj:
+                    result["indicators"]["macd"] = {"strength": getattr(macd_obj, 'strength', 50)}
+                # HV از market_data قبلاً گرفته شده ولی اینجا هم ذخیره کن
+            except Exception as _ind_e:
+                state.log(f"  ⚠️ خطا جمع‌آوری indicators: {_ind_e}", "WARN")
+            
             strategy.close()
             if analysis:
                 action, confidence, score, price = analysis
@@ -395,17 +426,25 @@ def analyze_technicals(symbol_config):
             except Exception as _e:
                 pass
 
-            # ATR از HV
+            # ATR از قیمت‌ها + HV
             atr_val = None
             try:
-                hv = result.get("indicators", {}).get("hv") or 0
-                # تخمین ATR از HV * قیمت
-                if result["price"] > 0 and hv:
-                    atr_val = float(result["price"]) * float(hv) / 100 * 0.1  # تخمین
-            except:
+                # اول از HV اگر موجود باشد (از market_data اصلی می‌آید ولی اینجا نداریم)
+                # پس از تاریخچه قیمت‌ها ATR بساز
+                import pandas as pd
+                import sqlite3
+                conn2 = sqlite3.connect(db)
+                df2 = pd.read_sql("SELECT last_price FROM prices WHERE last_price>0 ORDER BY id DESC LIMIT 30", conn2)
+                conn2.close()
+                if len(df2) >= 14:
+                    closes = df2["last_price"].astype(float).values
+                    # ATR ساده = میانگین True Range
+                    tr = [abs(closes[i] - closes[i-1]) for i in range(1, len(closes))]
+                    atr_val = sum(tr) / len(tr) if tr else None
+            except Exception as _atr_e:
                 pass
 
-            # Fibonacci details اگر موجود باشد
+            # Fibonacci details - حالا واقعاً پر می‌شود از strategy.fib
             fib_details = result.get("indicators", {}).get("fibonacci")
 
             vace_analysis = analyze_vace(
