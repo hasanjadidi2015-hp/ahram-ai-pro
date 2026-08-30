@@ -416,7 +416,8 @@ def analyze_technicals(symbol_config):
                 import pandas as pd
                 import sqlite3
                 conn = sqlite3.connect(db)
-                df = pd.read_sql("SELECT last_price FROM prices ORDER BY id", conn)
+                df = pd.read_sql("SELECT last_price FROM prices ORDER BY id DESC LIMIT 100", conn)
+                df = df.iloc[::-1].reset_index(drop=True)  # قدیمی به جدید (ADX ترتیب زمانی صعودی می‌خواد)
                 conn.close()
                 if len(df) >= 28:
                     from adx import ADX
