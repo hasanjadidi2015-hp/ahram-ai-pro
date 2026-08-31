@@ -91,8 +91,8 @@ def _ensure_table(cur):
         if col not in existing:
             try:
                 cur.execute(f"ALTER TABLE order_book ADD COLUMN {col} {coltype}")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠️ ORDER-BOOK WARNING: نتونستم ستون '{col}' رو اضافه کنم: {e}")
 
 
 def _get_field(lv, *names):
@@ -120,9 +120,9 @@ def collect_order_book(db_path=None, ins_code=None):
             # bid = pMeDem / qTitMeDem / zOrdMeDem
             # ask = pMeOf / qTitMeOf / zOrdMeOf  (و همچنین pMeArz/qTitMeArz/zOrdMeArz به عنوان fallback)
             level = int(_get_field(lv, "number", "depth", "level") or 0)
-            buy_cnt = int(float(_get_field(lv, "zOrdMeDem", "zOrdMeDem", "buyOrderCount", "buy_count") or 0))
-            buy_vol = float(_get_field(lv, "qTitMeDem", "qTitMeDem", "buyVolume", "buy_volume") or 0)
-            buy_price = float(_get_field(lv, "pMeDem", "pMeDem", "buyPrice", "buy_price") or 0)
+            buy_cnt = int(float(_get_field(lv, "zOrdMeDem", "buyOrderCount", "buy_count") or 0))
+            buy_vol = float(_get_field(lv, "qTitMeDem", "buyVolume", "buy_volume") or 0)
+            buy_price = float(_get_field(lv, "pMeDem", "buyPrice", "buy_price") or 0)
 
             sell_price = float(_get_field(lv, "pMeOf", "pMeOf", "pMeArz", "pMeArz", "sellPrice", "sell_price", "ask") or 0)
             sell_vol = float(_get_field(lv, "qTitMeOf", "qTitMeOf", "qTitMeArz", "qTitMeArz", "sellVolume", "sell_volume", "vol_ask") or 0)
@@ -170,6 +170,15 @@ def collect_order_book(db_path=None, ins_code=None):
 
     buy_side_empty = (best_buy in (None, 0)) and total_buy_vol == 0 and total_buy_cnt == 0
     sell_side_empty = (best_sell in (None, 0)) and total_sell_vol == 0 and total_sell_cnt == 0
+
+    if buy_side_empty and not sell_side_empty:
+        print("⚠️ ORDER-BOOK WARNING: سمت خرید کاملاً صفره ولی سمت فروش داده داره -- "
+              "ممکنه صف فروش واقعی باشه، یا ممکنه TSETMC اسم فیلدهای خرید رو عوض کرده باشه "
+              "(دقیقاً همون باگ pMeOf ولی این‌بار سمت خرید). کلیدهای ردیف خام برای چک:", levels[0] if levels else None)
+    elif sell_side_empty and not buy_side_empty:
+        print("⚠️ ORDER-BOOK WARNING: سمت فروش کاملاً صفره ولی سمت خرید داده داره -- "
+              "ممکنه صف خرید واقعی باشه، یا ممکنه نگاشت فیلد فروش دوباره عوض شده باشه. "
+              "کلیدهای ردیف خام برای چک:", levels[0] if levels else None)
 
     if buy_side_empty and sell_side_empty:
         market_state = "NO_DATA"

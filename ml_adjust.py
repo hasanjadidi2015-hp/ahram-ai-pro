@@ -42,14 +42,15 @@ def _extract_features(option_decision, score):
 def _ensure_position_id_column(cur):
     """train_model ممکنه قبل از اولین log_signal_to_db همین سیکل اجرا بشه --
     یعنی قبل از اینکه اون تابع ستون position_id رو خودترمیم کنه. برای همین
-    اینجا هم خودمون چک می‌کنیم."""
-    try:
-        cur.execute("PRAGMA table_info(signal_history)")
-        cols = {r[1] for r in cur.fetchall()}
-        if "position_id" not in cols:
-            cur.execute("ALTER TABLE signal_history ADD COLUMN position_id TEXT")
-    except Exception:
-        pass
+    اینجا هم خودمون چک می‌کنیم.
+    توجه: این تابع دیگه خطا رو قورت نمی‌ده -- اگه ALTER TABLE به هر دلیلی
+    (غیر از race بی‌ضرر) fail بشه، خطا بالا می‌ره تا train_model (که خودش
+    try/except و پیام WARN داره) از قضیه باخبر بشه، به‌جای اینکه بی‌سروصدا
+    ادامه بده و بعداً یهو query های position_id بی‌دلیل خالی برگردونن."""
+    cur.execute("PRAGMA table_info(signal_history)")
+    cols = {r[1] for r in cur.fetchall()}
+    if "position_id" not in cols:
+        cur.execute("ALTER TABLE signal_history ADD COLUMN position_id TEXT")
 
 
 def train_model(db_path):
@@ -126,17 +127,14 @@ def get_ml_adjustment(option_decision, score, db_path):
     feats = _extract_features(option_decision, score)
     if feats is None:
         return 0, None
-    try:
-        with open(model_file, "rb") as f:
-            model = pickle.load(f)
-        if isinstance(model, dict) and model.get("type") == "baseline":
-            p = model["win_rate"]
-        else:
-            p = model.predict_proba([feats])[0][1]
-        if p >= 0.65:
-            return 10, f"مدل یادگیری: احتمال برد بالا ({round(p*100)}%)"
-        elif p <= 0.35:
-            return -10, f"مدل یادگیری: احتمال برد پایین ({round(p*100)}%)"
-        return 0, None
-    except Exception:
-        return 0, None
+    with open(model_file, "rb") as f:
+        model = pickle.load(f)
+    if isinstance(model, dict) and model.get("type") == "baseline":
+        p = model["win_rate"]
+    else:
+        p = model.predict_proba([feats])[0][1]
+    if p >= 0.65:
+        return 10, f"مدل یادگیری: احتمال برد بالا ({round(p*100)}%)"
+    elif p <= 0.35:
+        return -10, f"مدل یادگیری: احتمال برد پایین ({round(p*100)}%)"
+    return 0, None

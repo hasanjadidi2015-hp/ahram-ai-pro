@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31 21:03:16",
+  "generated_at": "2026-08-31 22:30:07",
   "mode": "SHADOW_READ_ONLY",
   "signals_modified": false,
   "database_modified": false,
@@ -47,7 +47,7 @@
           "data_quality": "HIGH",
           "contracts_count": 24,
           "contracts_with_oi": 24,
-          "time": "2026-08-31 20:22:02"
+          "time": "2026-08-31 21:03:16"
         },
         {
           "expiry": "1405/07/29",
@@ -57,7 +57,7 @@
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 26,
-          "time": "2026-08-31 20:22:02"
+          "time": "2026-08-31 21:03:16"
         },
         {
           "expiry": "1405/08/27",
@@ -67,7 +67,7 @@
           "data_quality": "HIGH",
           "contracts_count": 22,
           "contracts_with_oi": 19,
-          "time": "2026-08-31 20:22:02"
+          "time": "2026-08-31 21:03:16"
         }
       ],
       "best_covered_call": {
@@ -175,7 +175,7 @@
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 26,
-          "time": "2026-08-31 20:22:02"
+          "time": "2026-08-31 21:03:16"
         },
         {
           "expiry": "1405/07/22",
@@ -185,7 +185,7 @@
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 23,
-          "time": "2026-08-31 20:22:02"
+          "time": "2026-08-31 21:03:16"
         },
         {
           "expiry": "1405/08/20",
@@ -195,7 +195,7 @@
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 19,
-          "time": "2026-08-31 20:22:02"
+          "time": "2026-08-31 21:03:16"
         }
       ],
       "best_covered_call": {
@@ -313,7 +313,7 @@
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 24,
-          "time": "2026-08-31 20:22:02"
+          "time": "2026-08-31 21:03:16"
         },
         {
           "expiry": "1405/08/13",
@@ -323,7 +323,7 @@
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 17,
-          "time": "2026-08-31 20:22:02"
+          "time": "2026-08-31 21:03:16"
         }
       ],
       "best_covered_call": {
