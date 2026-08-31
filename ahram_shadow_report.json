@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31 13:20:14",
+  "generated_at": "2026-08-31 21:03:16",
   "mode": "SHADOW_READ_ONLY",
   "signals_modified": false,
   "database_modified": false,
@@ -7,10 +7,10 @@
   "symbols": {
     "اهرم": {
       "symbol": "اهرم",
-      "stock_price": 57012.0,
+      "stock_price": 57106.0,
       "signal": {
-        "id": 229,
-        "time": "2026-08-31 12:28:18",
+        "id": 230,
+        "time": "2026-08-31 19:42:05",
         "symbol": "اهرم",
         "signal_type": "WATCH",
         "score": 0.0,
@@ -19,7 +19,7 @@
         "strike_price": null,
         "outcome": "PENDING",
         "outcome_pct": 0.0,
-        "details": "{\"type\": \"WATCH\", \"score\": 0, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 68.5% (ELEVATED)\", \"✅ FOG: CLEAN\", \"⚠️ TAPE: 1/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-31T12:28:18.477779\", \"message\": \"\\nاهرم: WATCH (امتیاز: 0)\\n\"}"
+        "details": "{\"type\": \"WATCH\", \"score\": 0, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 67.9% (ELEVATED)\", \"✅ FOG: CLEAN\", \"⚠️ TAPE: 1/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-31T19:42:05.199558\", \"message\": \"\\nاهرم: WATCH (امتیاز: 0)\\n\"}"
       },
       "chain_metrics": {
         "available": true,
@@ -27,47 +27,47 @@
         "calls_count": 36,
         "puts_count": 36,
         "contracts_with_oi": 69,
-        "call_volume": 23347.0,
-        "put_volume": 15438.0,
-        "call_put_volume_ratio": 1.5123072936908926,
-        "call_open_interest": 3236037.0,
-        "put_open_interest": 2816959.0,
-        "call_put_oi_ratio": 1.1487696484045384,
+        "call_volume": 23681.0,
+        "put_volume": 15744.0,
+        "call_put_volume_ratio": 1.5041285569105691,
+        "call_open_interest": 3228371.0,
+        "put_open_interest": 2810506.0,
+        "call_put_oi_ratio": 1.1486796327778699,
         "nearest_strike": 56000.0,
-        "nearest_strike_distance_pct": -1.7750648986178348,
+        "nearest_strike_distance_pct": -1.9367492032360873,
         "quality": "HIGH",
         "role": "exploratory_only"
       },
       "max_pain": [
         {
           "expiry": "1405/06/25",
-          "stock_price": 57012.0,
+          "stock_price": 57106.0,
           "max_pain_strike": 42000.0,
-          "distance_pct": 26.331298673963378,
+          "distance_pct": 26.452561902427064,
           "data_quality": "HIGH",
           "contracts_count": 24,
           "contracts_with_oi": 24,
-          "time": "2026-08-31 13:17:37"
+          "time": "2026-08-31 20:22:02"
         },
         {
           "expiry": "1405/07/29",
-          "stock_price": 57012.0,
+          "stock_price": 57106.0,
           "max_pain_strike": 50000.0,
-          "distance_pct": 12.299165088051637,
+          "distance_pct": 12.443526074317935,
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 26,
-          "time": "2026-08-31 13:17:37"
+          "time": "2026-08-31 20:22:02"
         },
         {
           "expiry": "1405/08/27",
-          "stock_price": 57012.0,
+          "stock_price": 57106.0,
           "max_pain_strike": 30000.0,
-          "distance_pct": 47.37949905283098,
+          "distance_pct": 47.466115644590765,
           "data_quality": "HIGH",
           "contracts_count": 22,
           "contracts_with_oi": 19,
-          "time": "2026-08-31 13:17:37"
+          "time": "2026-08-31 20:22:02"
         }
       ],
       "best_covered_call": {
@@ -76,10 +76,10 @@
         "premium": 5000.0,
         "days_to_expire": 79,
         "volume": 99.0,
-        "open_interest": 962.0,
-        "premium_pct_of_stock": 8.770083491194836,
-        "max_profit_per_share": 9988.0,
-        "max_profit_per_contract": 9988000.0,
+        "open_interest": 964.0,
+        "premium_pct_of_stock": 8.755647392568207,
+        "max_profit_per_share": 9894.0,
+        "max_profit_per_contract": 9894000.0,
         "selection_role": "shadow_candidate_only",
         "expiry": "1405/08/27"
       },
@@ -95,7 +95,7 @@
         "risk_reward": 19.0,
         "break_even": 62300.0,
         "days_to_expire": 79,
-        "liquidity_score": 2828.0,
+        "liquidity_score": 2867.0,
         "selection_role": "shadow_candidate_only",
         "expiry": "1405/08/27"
       },
@@ -121,13 +121,13 @@
         "call_strike": 80000.0,
         "put_strike": 34000.0,
         "net_premium_per_share": 1459.0,
-        "max_profit_per_share": 24447.0,
-        "max_loss_per_share": -21553.0,
-        "max_profit_per_contract": 24447000.0,
-        "max_loss_per_contract": -21553000.0,
-        "protection_pct": 40.36343225987512,
+        "max_profit_per_share": 24353.0,
+        "max_loss_per_share": -21647.0,
+        "max_profit_per_contract": 24353000.0,
+        "max_loss_per_contract": -21647000.0,
+        "protection_pct": 40.4615977305362,
         "days_to_expire": 79,
-        "liquidity_score": 10321.0,
+        "liquidity_score": 10337.0,
         "selection_role": "shadow_candidate_only",
         "expiry": "1405/08/27"
       },
@@ -135,67 +135,67 @@
     },
     "وبملت": {
       "symbol": "وبملت",
-      "stock_price": 1568.0,
+      "stock_price": 1564.0,
       "signal": {
-        "id": 225,
-        "time": "2026-08-31 12:28:23",
+        "id": 226,
+        "time": "2026-08-31 19:42:12",
         "symbol": "وبملت",
         "signal_type": "WATCH",
-        "score": 55.0,
+        "score": 56.0,
         "option_symbol": null,
         "option_price": null,
         "strike_price": null,
         "outcome": null,
         "outcome_pct": null,
-        "details": "{\"type\": \"WATCH\", \"score\": 55, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 68.9% (ELEVATED)\", \"✅ FOG: LIGHT\", \"⚠️ TAPE: 2/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-31T12:28:23.149294\", \"message\": \"\\nوبملت: WATCH (امتیاز: 55)\\n\"}"
+        "details": "{\"type\": \"WATCH\", \"score\": 56, \"checks_passed\": 4, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 73.7% (HIGH)\", \"✅ FOG: LIGHT\", \"⚠️ TAPE: 2/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-31T19:42:12.509604\", \"message\": \"\\nوبملت: WATCH (امتیاز: 56)\\n\"}"
       },
       "chain_metrics": {
         "available": true,
         "contracts_total": 78,
         "calls_count": 39,
         "puts_count": 39,
-        "contracts_with_oi": 67,
-        "call_volume": 66980.0,
-        "put_volume": 16079.0,
-        "call_put_volume_ratio": 4.165681945394614,
-        "call_open_interest": 51832443.0,
-        "put_open_interest": 9906519.0,
-        "call_put_oi_ratio": 5.232155008232458,
+        "contracts_with_oi": 68,
+        "call_volume": 67979.0,
+        "put_volume": 16270.0,
+        "call_put_volume_ratio": 4.178180700676091,
+        "call_open_interest": 51851551.0,
+        "put_open_interest": 9918583.0,
+        "call_put_oi_ratio": 5.22771760845274,
         "nearest_strike": 1554.0,
-        "nearest_strike_distance_pct": -0.8928571428571428,
+        "nearest_strike_distance_pct": -0.639386189258312,
         "quality": "HIGH",
         "role": "exploratory_only"
       },
       "max_pain": [
         {
           "expiry": "1405/06/18",
-          "stock_price": 1568.0,
+          "stock_price": 1564.0,
           "max_pain_strike": 1254.0,
-          "distance_pct": 20.02551020408163,
+          "distance_pct": 19.82097186700767,
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 26,
-          "time": "2026-08-31 13:17:38"
+          "time": "2026-08-31 20:22:02"
         },
         {
           "expiry": "1405/07/22",
-          "stock_price": 1568.0,
+          "stock_price": 1564.0,
           "max_pain_strike": 954.0,
-          "distance_pct": 39.15816326530612,
+          "distance_pct": 39.00255754475703,
           "data_quality": "HIGH",
           "contracts_count": 26,
-          "contracts_with_oi": 22,
-          "time": "2026-08-31 13:17:38"
+          "contracts_with_oi": 23,
+          "time": "2026-08-31 20:22:02"
         },
         {
           "expiry": "1405/08/20",
-          "stock_price": 1568.0,
+          "stock_price": 1564.0,
           "max_pain_strike": 800.0,
-          "distance_pct": 48.97959183673469,
+          "distance_pct": 48.84910485933504,
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 19,
-          "time": "2026-08-31 13:17:38"
+          "time": "2026-08-31 20:22:02"
         }
       ],
       "best_covered_call": {
@@ -205,9 +205,9 @@
         "days_to_expire": 72,
         "volume": 91.0,
         "open_interest": 10723.0,
-        "premium_pct_of_stock": 14.158163265306122,
-        "max_profit_per_share": 254.0,
-        "max_profit_per_contract": 254000.0,
+        "premium_pct_of_stock": 14.194373401534527,
+        "max_profit_per_share": 258.0,
+        "max_profit_per_contract": 258000.0,
         "selection_role": "shadow_candidate_only",
         "expiry": "1405/08/20"
       },
@@ -223,7 +223,7 @@
         "risk_reward": 15.666666666666666,
         "break_even": 1812.0,
         "days_to_expire": 72,
-        "liquidity_score": 124592.0,
+        "liquidity_score": 125595.0,
         "selection_role": "shadow_candidate_only",
         "expiry": "1405/08/20"
       },
@@ -249,13 +249,13 @@
         "call_strike": 2000.0,
         "put_strike": 1100.0,
         "net_premium_per_share": 114.0,
-        "max_profit_per_share": 546.0,
-        "max_loss_per_share": -354.0,
-        "max_profit_per_contract": 546000.0,
-        "max_loss_per_contract": -354000.0,
-        "protection_pct": 29.846938775510207,
+        "max_profit_per_share": 550.0,
+        "max_loss_per_share": -350.0,
+        "max_profit_per_contract": 550000.0,
+        "max_loss_per_contract": -350000.0,
+        "protection_pct": 29.66751918158568,
         "days_to_expire": 72,
-        "liquidity_score": 120429.0,
+        "liquidity_score": 121432.0,
         "selection_role": "shadow_candidate_only",
         "expiry": "1405/08/20"
       },
@@ -263,19 +263,19 @@
     },
     "شستا": {
       "symbol": "شستا",
-      "stock_price": 2928.0,
+      "stock_price": 2998.0,
       "signal": {
-        "id": 228,
-        "time": "2026-08-31 12:28:25",
+        "id": 229,
+        "time": "2026-08-31 19:42:15",
         "symbol": "شستا",
         "signal_type": "WATCH",
-        "score": 0.0,
+        "score": 32.0,
         "option_symbol": null,
         "option_price": null,
         "strike_price": null,
         "outcome": null,
         "outcome_pct": null,
-        "details": "{\"type\": \"WATCH\", \"score\": 0, \"checks_passed\": 3, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 57.3% (ELEVATED)\", \"❌ FOG: FOG\", \"⚠️ TAPE: 2/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-31T12:28:25.734140\", \"message\": \"\\nشستا: WATCH (امتیاز: 0)\\n\"}"
+        "details": "{\"type\": \"WATCH\", \"score\": 32, \"checks_passed\": 3, \"checks_total\": 7, \"reasons\": [\"❌ تحلیل تکنیکال: خنثی\", \"✅ حجم: تأیید\", \"❌ آپشن: نامناسب\", \"✅ WIV: 44.4% (NORMAL)\", \"❌ FOG: FOG\", \"⚠️ TAPE: 2/5\", \"⚠️ حجم: خنثی\", \"✅ فضای بازار: بررسی شد\"], \"option\": null, \"timestamp\": \"2026-08-31T19:42:15.314330\", \"message\": \"\\nشستا: WATCH (امتیاز: 32)\\n\"}"
       },
       "chain_metrics": {
         "available": true,
@@ -283,14 +283,14 @@
         "calls_count": 26,
         "puts_count": 26,
         "contracts_with_oi": 41,
-        "call_volume": 6127.0,
-        "put_volume": 1390.0,
-        "call_put_volume_ratio": 4.407913669064748,
-        "call_open_interest": 3394144.0,
-        "put_open_interest": 391280.0,
-        "call_put_oi_ratio": 8.674463299938663,
+        "call_volume": 6200.0,
+        "put_volume": 1410.0,
+        "call_put_volume_ratio": 4.397163120567376,
+        "call_open_interest": 3398298.0,
+        "put_open_interest": 388390.0,
+        "call_put_oi_ratio": 8.749705193233606,
         "nearest_strike": 3000.0,
-        "nearest_strike_distance_pct": 2.459016393442623,
+        "nearest_strike_distance_pct": 0.06671114076050699,
         "quality": "HIGH",
         "role": "exploratory_only"
       },
@@ -307,23 +307,23 @@
         },
         {
           "expiry": "1405/07/15",
-          "stock_price": 2928.0,
+          "stock_price": 2998.0,
           "max_pain_strike": 2600.0,
-          "distance_pct": 11.202185792349727,
+          "distance_pct": 13.275517011340893,
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 24,
-          "time": "2026-08-31 13:17:38"
+          "time": "2026-08-31 20:22:02"
         },
         {
           "expiry": "1405/08/13",
-          "stock_price": 2928.0,
+          "stock_price": 2998.0,
           "max_pain_strike": 1600.0,
-          "distance_pct": 45.3551912568306,
+          "distance_pct": 46.63108739159439,
           "data_quality": "HIGH",
           "contracts_count": 26,
           "contracts_with_oi": 17,
-          "time": "2026-08-31 13:17:38"
+          "time": "2026-08-31 20:22:02"
         }
       ],
       "best_covered_call": {
@@ -333,9 +333,9 @@
         "days_to_expire": 65,
         "volume": 21.0,
         "open_interest": 9449.0,
-        "premium_pct_of_stock": 14.310109289617486,
-        "max_profit_per_share": 491.0,
-        "max_profit_per_contract": 491000.0,
+        "premium_pct_of_stock": 13.975983989326219,
+        "max_profit_per_share": 421.0,
+        "max_profit_per_contract": 421000.0,
         "selection_role": "shadow_candidate_only",
         "expiry": "1405/08/13"
       },
@@ -377,11 +377,11 @@
         "call_strike": 3750.0,
         "put_strike": 1600.0,
         "net_premium_per_share": 120.0,
-        "max_profit_per_share": 942.0,
-        "max_loss_per_share": -1208.0,
-        "max_profit_per_contract": 942000.0,
-        "max_loss_per_contract": -1208000.0,
-        "protection_pct": 45.3551912568306,
+        "max_profit_per_share": 872.0,
+        "max_loss_per_share": -1278.0,
+        "max_profit_per_contract": 872000.0,
+        "max_loss_per_contract": -1278000.0,
+        "protection_pct": 46.63108739159439,
         "days_to_expire": 65,
         "liquidity_score": 9934.0,
         "selection_role": "shadow_candidate_only",
