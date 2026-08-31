@@ -168,24 +168,46 @@ def _symbol_info(name, db):
         rows = _safe(cur, "SELECT COUNT(*) FROM daily_news WHERE event_date=date('now')")
         if rows:
             info["news_count"] = rows[0][0]
-        rows = _safe(cur, "SELECT buy_price, sell_price, buy_volume, sell_volume FROM order_book ORDER BY id DESC LIMIT 5")
+        # فیکس باگ 2026-08-31: تشخیص صف خرید/فروش برعکس بود - منطق جدید مثل order_book.py ولی مقاوم به stale
+        latest_time_rows = _safe(cur, "SELECT time FROM order_book ORDER BY id DESC LIMIT 1")
+        latest_time = latest_time_rows[0][0] if latest_time_rows else None
+        if latest_time:
+            rows = _safe(cur, "SELECT buy_price, sell_price, buy_volume, sell_volume, buy_count, sell_count FROM order_book WHERE time=? ORDER BY level ASC, id ASC", (latest_time,))
+            if not rows:
+                rows = _safe(cur, "SELECT buy_price, sell_price, buy_volume, sell_volume, buy_count, sell_count FROM order_book ORDER BY id DESC LIMIT 5")
+        else:
+            rows = _safe(cur, "SELECT buy_price, sell_price, buy_volume, sell_volume, buy_count, sell_count FROM order_book ORDER BY id DESC LIMIT 5")
         if rows:
             buy_prices = [float(r[0] or 0) for r in rows]
             sell_prices = [float(r[1] or 0) for r in rows]
             buy_vol = sum(float(r[2] or 0) for r in rows)
             sell_vol = sum(float(r[3] or 0) for r in rows)
-            has_buy, has_sell = any(buy_prices), any(sell_prices)
-            if has_buy and not has_sell:
+            buy_cnt = sum(int(float(r[4] or 0)) for r in rows)
+            sell_cnt = sum(int(float(r[5] or 0)) for r in rows)
+            best_buy = float(rows[0][0] or 0) if rows else 0
+            if best_buy == 0:
+                best_buy = next((x for x in buy_prices if x > 0), 0)
+            best_sell = float(rows[0][1] or 0) if rows else 0
+            if best_sell == 0:
+                best_sell = next((x for x in sell_prices if x > 0), 0)
+            # مقاوم به قیمت stale: اگر حجم و تعداد صفر، طرف خالی است
+            buy_side_empty = (buy_vol == 0 and buy_cnt == 0)
+            sell_side_empty = (sell_vol == 0 and sell_cnt == 0)
+            if best_buy == 0:
+                buy_side_empty = buy_side_empty or (buy_vol == 0)
+            if best_sell == 0:
+                sell_side_empty = sell_side_empty or (sell_vol == 0)
+            if buy_side_empty and sell_side_empty:
+                info["order_state"] = "NO_DATA"
+            elif sell_side_empty and not buy_side_empty:
                 info["order_state"] = "LOCKED_BUY_QUEUE"
                 info["order_pressure"] = "BUY_QUEUE"
-            elif has_sell and not has_buy:
+            elif buy_side_empty and not sell_side_empty:
                 info["order_state"] = "LOCKED_SELL_QUEUE"
                 info["order_pressure"] = "SELL_QUEUE"
-            elif has_buy and has_sell and buy_vol + sell_vol > 0:
+            elif buy_vol + sell_vol > 0:
                 info["order_state"] = "TWO_SIDED"
                 info["imbalance"] = round((buy_vol - sell_vol) / (buy_vol + sell_vol) * 100, 1)
-                best_buy = next((x for x in buy_prices if x > 0), 0)
-                best_sell = next((x for x in sell_prices if x > 0), 0)
                 if best_buy and best_sell >= best_buy:
                     info["spread"] = round((best_sell - best_buy) / best_buy * 100, 3)
                 if info["imbalance"] > 20:
