@@ -91,6 +91,12 @@ class Strategy:
         open_minutes = self.MARKET_OPEN.hour * 60 + self.MARKET_OPEN.minute
         close_minutes = self.MARKET_CLOSE.hour * 60 + self.MARKET_CLOSE.minute
         now_minutes = now.hour * 60 + now.minute
+        # اول چک کن اصلاً داخل بازه‌ی معاملاتی هستیم یا نه -- وگرنه چک‌های زیر
+        # (که فقط یه طرفشون باز/بسته‌ست) هر ساعتی بعد از ظهر تا صبح فردا رو هم
+        # به‌غلط "نزدیک بسته شدن بازار" حساب می‌کردن (باگ قدیمی: ۲۲:۰۲ شب هم
+        # QUIET PERIOD چاپ می‌شد چون شرط بالایی سقف نداشت).
+        if now_minutes < open_minutes or now_minutes > close_minutes:
+            return False
         if now_minutes < open_minutes + self.QUIET_START_MINUTES:
             return True
         if now_minutes > close_minutes - self.QUIET_END_MINUTES:
