@@ -6,6 +6,7 @@
 ╚══════════════════════════════════════════════════════════════╝
 """
 import sys
+import os
 import sqlite3
 import time
 import json
@@ -17,6 +18,39 @@ try:
     sys.stdout.reconfigure(encoding="utf-8")
 except:
     pass
+
+# ==================== لاگ خودکار روی فایل ====================
+# قبلاً همه‌چیز فقط رو صفحه چاپ می‌شد و اگه پنجره‌ی ترمینال بسته می‌شد یا
+# اسکرول رد می‌شد، اون خروجی برای همیشه از دست می‌رفت (دقیقاً همون مشکلی که
+# باعث شد نتونیم بفهمیم چرا داشتبورد یک ساعت از قفل صف فروش وبملت عقب بود).
+# از این به بعد هر خطی که با print() یا state.log() چاپ می‌شه، هم‌زمان تو یه
+# فایل لاگ روزانه هم ذخیره می‌شه -- بدون اینکه چیزی از نمایش رو صفحه کم بشه.
+class _TeeToLogFile:
+    """هر چی رو صفحه چاپ می‌شه رو هم‌زمان تو یه فایل هم می‌نویسه."""
+    def __init__(self, stream, log_path):
+        self._stream = stream
+        self._log_file = open(log_path, "a", encoding="utf-8")
+
+    def write(self, message):
+        self._stream.write(message)
+        self._log_file.write(message)
+        self._log_file.flush()  # بدون این، اگه برنامه crash کنه آخرین خط‌ها ذخیره نمی‌شن
+
+    def flush(self):
+        self._stream.flush()
+        self._log_file.flush()
+
+    def isatty(self):
+        return getattr(self._stream, "isatty", lambda: False)()
+
+
+def _enable_file_logging():
+    log_dir = Path(__file__).resolve().parent / "logs"
+    log_dir.mkdir(exist_ok=True)
+    log_path = log_dir / f"ahram_pro_{datetime.now().strftime('%Y-%m-%d')}.log"
+    sys.stdout = _TeeToLogFile(sys.stdout, log_path)
+    sys.stderr = _TeeToLogFile(sys.stderr, log_path)
+    print(f"📝 لاگ این اجرا هم‌زمان ذخیره می‌شه در: {log_path}")
 
 try:
     import ml_adjust
@@ -992,6 +1026,7 @@ def run():
 
 
 if __name__ == "__main__":
+    _enable_file_logging()
     if "--test" in sys.argv:
         run_cycle()
     else:
