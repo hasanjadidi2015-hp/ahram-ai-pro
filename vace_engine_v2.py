@@ -13,6 +13,8 @@ AHRAM AI PRO - VACE Engine V2 - ماژول 7 از 7
 import sqlite3
 import math
 import numpy as np
+import pandas as pd
+from adx import ADX
 
 # ==================== Auto-Calibration Engine ====================
 
@@ -34,9 +36,14 @@ def calculate_percentile(data, percentile=50):
         return d0 + d1
 
 def get_adx_history(db_path, limit=300):
-    """خواندن تاریخچه ADX از دیتابیس اگر موجود باشد، یا از prices محاسبه کن"""
-    # برای سادگی: از iv_history یا قیمت‌ها ADX محاسبه می‌کنیم
-    # فعلا از prices برای محاسبه ADX history استفاده می‌کنیم
+    """خواندن تاریخچه ADX از دیتابیس اگر موجود باشد، یا از prices محاسبه کن.
+
+    نکته‌ی مهم: این تابع از همون کلاس ADX واقعی (adx.py) استفاده می‌کنه --
+    همون کلاسی که current_adx بیرون از این تابع باهاش محاسبه می‌شه. قبلاً اینجا
+    یه فرمول DX ساده‌ی دستی جدا داشت که هیچ ربطی به فرمول EWM/Wilder کلاس ADX
+    نداشت -- یعنی صدک ۵۰ ی تاریخچه با current_adx واقعی داشت مقایسه می‌شد در
+    حالی که از دو روش کاملاً متفاوت می‌اومدن (سیب با پرتقال). حالا هر دو از
+    یک منبع میان و قابل‌مقایسه‌ن."""
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -47,45 +54,31 @@ def get_adx_history(db_path, limit=300):
             if rows and len(rows) >= 20:
                 conn.close()
                 return [float(r[0]) for r in rows if r[0] is not None]
-        except:
+        except Exception:
             pass
-        
-        # fallback: از prices ADX بساز
-        cur.execute("SELECT last_price FROM prices WHERE last_price>0 ORDER BY id DESC LIMIT ?", (limit+28,))
+
+        # fallback: از prices با همون کلاس ADX واقعی، روی پنجره‌ی غلتان، تاریخچه بساز
+        WINDOW = 42  # ~3x دوره‌ی 14 -- برای warm-up کافی EWM، هم‌اندازه‌ی چیزی که کلاس ADX واقعی نیاز داره
+        cur.execute("SELECT last_price FROM prices WHERE last_price>0 ORDER BY id DESC LIMIT ?", (limit + WINDOW,))
         prices = cur.fetchall()
         conn.close()
-        
-        if len(prices) < 30:
+
+        if len(prices) < WINDOW + 20:
             return None
-            
-        close = [float(p[0]) for p in reversed(prices)]  # قدیمی به جدید
-        
-        # محاسبه ADX ساده
+
+        closes = [float(p[0]) for p in reversed(prices)]  # قدیمی به جدید
+
         adx_values = []
-        # برای هر پنجره 14 روزه
-        for i in range(14, len(close)):
-            window = close[max(0, i-28):i+1]
-            if len(window) < 28:
-                continue
-            # محاسبه ساده ADX
-            up = np.diff(window)
-            plus_dm = np.where((up > 0) & (up > -np.roll(up, 1)), up, 0.0)
-            minus_dm = np.where((-up > 0) & (-up > np.roll(up, 1)), -up, 0.0)
-            tr = np.abs(np.diff(window))
-            if len(tr) == 0:
-                continue
-            atr = np.mean(tr[-14:]) if len(tr) >= 14 else np.mean(tr)
-            if atr == 0:
-                continue
-            plus_di = 100 * np.mean(plus_dm[-14:]) / atr if len(plus_dm) >= 14 else 0
-            minus_di = 100 * np.mean(minus_dm[-14:]) / atr if len(minus_dm) >= 14 else 0
-            if plus_di + minus_di == 0:
-                continue
-            dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
-            adx_values.append(dx)
-        
+        for i in range(WINDOW, len(closes)):
+            window = closes[i - WINDOW:i + 1]
+            df_slice = pd.DataFrame({"last_price": window})
+            adx_obj = ADX(df_slice)
+            adx_obj.calculate()
+            if adx_obj.adx_value:
+                adx_values.append(adx_obj.adx_value)
+
         return adx_values[-limit:] if adx_values else None
-        
+
     except Exception as e:
         print(f"[VACE] خطا get_adx_history: {e}")
         return None
