@@ -25,6 +25,34 @@ try:
 except:
     pass
 
+# ==================== لاگ خودکار روی فایل (مثل V4) ====================
+class _TeeToLogFile:
+    """هر چی رو صفحه چاپ می‌شه رو هم‌زمان تو یه فایل هم می‌نویسه."""
+    def __init__(self, stream, log_path):
+        self._stream = stream
+        self._log_file = open(log_path, "a", encoding="utf-8")
+
+    def write(self, message):
+        self._stream.write(message)
+        self._log_file.write(message)
+        self._log_file.flush()
+
+    def flush(self):
+        self._stream.flush()
+        self._log_file.flush()
+
+    def isatty(self):
+        return getattr(self._stream, "isatty", lambda: False)()
+
+
+def _enable_file_logging():
+    log_dir = Path(__file__).resolve().parent / "logs"
+    log_dir.mkdir(exist_ok=True)
+    log_path = log_dir / f"ahram_pro_v5_{datetime.now().strftime('%Y-%m-%d')}.log"
+    sys.stdout = _TeeToLogFile(sys.stdout, log_path)
+    sys.stderr = _TeeToLogFile(sys.stderr, log_path)
+    print(f"📝 لاگ این اجرا هم‌زمان ذخیره می‌شه در: {log_path}")
+
 # ===== ماژول‌های قدیمی (v4.1) =====
 try:
     import ml_adjust
@@ -1448,6 +1476,7 @@ def run():
 
 
 if __name__ == "__main__":
+    _enable_file_logging()
     if "--test" in sys.argv:
         run_cycle()
     else:
