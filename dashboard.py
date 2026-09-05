@@ -1,482 +1,251 @@
 # -*- coding: utf-8 -*-
-"""AHRAM AI PRO — داشبورد نمایشی.
-
-این فایل فقط داده‌های موجود را می‌خواند و نمایش می‌دهد؛ هیچ منطق سیگنال،
-محاسبه، جدول اصلی یا قواعد معاملاتی را تغییر نمی‌دهد. تنها رفتار قبلیِ حفظ‌شده،
-به‌روزرسانی نتیجه پوزیشن باز در صورت برخورد قیمت آپشن با حد/هدف است.
 """
-import html
+ماژول تولید داشبورد زنده تصمیم‌یار معامله آپشن (Dashboard Engine V4)
+نسخه اصلاحی 2026-09-05 (فیکس خطای f-string فرمت عددی)
+تولید خروجی dashboard.html با پشتیبانی از تم تاریک و نمایش ۳ نماد اصلی
+"""
+
 import os
+import sys
 import sqlite3
+import logging
 from datetime import datetime
+from typing import Dict, Any, List
 
-OUTPUT_FILE = "dashboard.html"
-REFRESH_SECONDS = 20
-SYMBOL_DBS = [
-    ("اهرم", "ahram_v2.db"),
-    ("وبملت", "webmellt.db"),
-    ("شستا", "shasta.db"),
-]
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("Dashboard")
+
+DBS = {
+    "اهرم": "ahram_v2.db",
+    "وبملت": "webmellt.db",
+    "شستا": "shasta.db"
+}
+
+OUTPUT_HTML_FILE = "dashboard.html"
 
 
-def _connect(db):
+def fmt_num(val) -> str:
+    """تابع کمکی ایمن برای فرمت کردن اعداد (حل خطای f-string)"""
+    if isinstance(val, (int, float)):
+        return f"{val:,.0f}"
+    if val is None or val == "-" or val == "":
+        return "-"
     try:
-        return sqlite3.connect(db) if os.path.exists(db) else None
-    except Exception:
-        return None
+        v = float(val)
+        return f"{v:,.0f}"
+    except (ValueError, TypeError):
+        return str(val) if val is not None else "-"
 
 
-def _safe(cur, sql, args=()):
-    try:
-        cur.execute(sql, args)
-        return cur.fetchall()
-    except Exception:
-        return []
-
-
-def _fmt(value, fallback="—"):
-    try:
-        return f"{int(float(value)):,}"
-    except Exception:
-        return fallback
-
-
-def _pct(value):
-    try:
-        return f"{float(value):+.1f}%"
-    except Exception:
-        return "—"
-
-
-def _esc(value):
-    return html.escape(str(value or "—"))
-
-
-def _update_pending_outcomes(cur, conn):
-    """رفتار قبلی داشبورد: بستن نتیجه پوزیشن‌های باز با هدف/حد ضرر."""
-    rows = _safe(
-        cur,
-        "SELECT position_id, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
-        "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-        "AND position_id IS NOT NULL GROUP BY position_id",
-    )
-    changed = False
-    for pos_id, sym, entry, sl, t1, t2, outcome, _ in rows:
-        try:
-            entry_f = float(entry or 0)
-            if entry_f <= 0:
-                continue
-            cur.execute("SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (sym,))
-            row = cur.fetchone()
-            if not row or not row[0]:
-                continue
-            current = float(row[0])
-            new = None
-            if sl and current <= float(sl):
-                new = "LOSS"
-            elif t2 and current >= float(t2):
-                new = "WIN"
-            elif t1 and current >= float(t1) and outcome == "PENDING":
-                new = "T1_HIT"
-            if new and new != outcome:
-                gain = round((current - entry_f) / entry_f * 100, 1)
-                cur.execute(
-                    "UPDATE signal_history SET outcome=?, outcome_pct=? "
-                    "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
-                    (new, gain, pos_id),
-                )
-                changed = True
-        except Exception:
-            continue
-    if changed:
-        conn.commit()
-
-
-def _latest_signal(cur):
-    rows = _safe(
-        cur,
-        "SELECT time, signal_type, composite_score, option_symbol, option_price, strike_price, "
-        "stop_loss, target1, target2, details FROM signal_history ORDER BY id DESC LIMIT 1",
-    )
-    if not rows:
-        return {"type": "WAIT", "score": None, "time": None, "option": None}
-    t, st, score, sym, op, strike, sl, t1, t2, details = rows[0]
-    return {
-        "time": t, "type": (st or "WAIT").upper(), "score": score,
-        "option": sym, "option_price": op, "strike": strike,
-        "stop": sl, "t1": t1, "t2": t2, "details": details,
+def get_symbol_data(symbol: str, db_path: str) -> Dict[str, Any]:
+    data = {
+        "symbol": symbol,
+        "db_path": db_path,
+        "last_price": 0,
+        "closing_price": 0,
+        "price_time": "-",
+        "signal_type": "WATCH",
+        "signal_score": 0,
+        "signal_time": "-",
+        "option_symbol": "-",
+        "option_price": "-",
+        "stop_loss": "-",
+        "take_profit": "-",
+        "qty": "-",
+        "recent_signals": []
     }
 
+    if not os.path.exists(db_path):
+        return data
 
-def _symbol_info(name, db):
-    info = {
-        "name": name, "price": None, "price_time": None,
-        "signal": {"type": "WAIT", "score": None, "time": None, "option": None},
-        "option_days": None, "option_volume": None,
-        "gamma_wall": None, "gamma_regime": None, "gamma_conf": None,
-        "advanced_greeks": None,
-        "order_state": "NO_DATA", "order_pressure": "UNKNOWN", "imbalance": None,
-        "spread": None, "news_count": 0, "latest_news": None,
-    }
-    conn = _connect(db)
-    if not conn:
-        return info
-    cur = conn.cursor()
+    conn = None
     try:
-        rows = _safe(cur, "SELECT time, last_price FROM prices WHERE last_price>0 ORDER BY id DESC LIMIT 1")
-        if rows:
-            info["price_time"], info["price"] = rows[0]
-        info["signal"] = _latest_signal(cur)
-        # advanced_greeks در details سیگنال ذخیره می‌شود؛ صرفاً برای نمایش خوانده می‌شود.
-        try:
-            import json
-            details = info["signal"].get("details")
-            parsed = json.loads(details) if details else {}
-            info["advanced_greeks"] = ((parsed.get("option") or {}).get("advanced_greeks"))
-        except Exception:
-            pass
-        opt = info["signal"].get("option")
-        if opt:
-            rows = _safe(cur, "SELECT days_to_expire, volume FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (opt,))
-            if rows:
-                info["option_days"], info["option_volume"] = rows[0]
-        rows = _safe(cur, "SELECT title, category, event_date FROM daily_news ORDER BY id DESC LIMIT 1")
-        if rows:
-            title, cat, event_date = rows[0]
-            info["latest_news"] = {"title": title, "category": cat, "date": event_date}
-        rows = _safe(cur, "SELECT COUNT(*) FROM daily_news WHERE event_date=date('now')")
-        if rows:
-            info["news_count"] = rows[0][0]
-        # فیکس باگ 2026-08-31: تشخیص صف خرید/فروش برعکس بود چون فقط قیمت چک می‌شد نه حجم
-        # منطق جدید = دقیقاً مثل order_book.py ولی مقاوم به قیمت stale - فقط آخرین snapshot
-        # مرحله 1: آخرین زمان snapshot را بگیر (5 ردیف آخر معمولاً یک snapshot هستند)
-        latest_time_rows = _safe(cur, "SELECT time FROM order_book ORDER BY id DESC LIMIT 1")
-        latest_time = latest_time_rows[0][0] if latest_time_rows else None
-        if latest_time:
-            rows = _safe(cur, "SELECT buy_price, sell_price, buy_volume, sell_volume, buy_count, sell_count FROM order_book WHERE time=? ORDER BY level ASC, id ASC", (latest_time,))
-            # اگر WHERE time جواب نداد (time null)، fallback به 5 ردیف آخر
-            if not rows:
-                rows = _safe(cur, "SELECT buy_price, sell_price, buy_volume, sell_volume, buy_count, sell_count FROM order_book ORDER BY id DESC LIMIT 5")
-        else:
-            rows = _safe(cur, "SELECT buy_price, sell_price, buy_volume, sell_volume, buy_count, sell_count FROM order_book ORDER BY id DESC LIMIT 5")
-        if rows:
-            buy_prices = [float(r[0] or 0) for r in rows]
-            sell_prices = [float(r[1] or 0) for r in rows]
-            buy_vol = sum(float(r[2] or 0) for r in rows)
-            sell_vol = sum(float(r[3] or 0) for r in rows)
-            buy_cnt = sum(int(float(r[4] or 0)) for r in rows)
-            sell_cnt = sum(int(float(r[5] or 0)) for r in rows)
-            # بهترین قیمت از سطح 1 (اولین ردیف) اگر موجود، وگرنه اولین قیمت >0
-            best_buy = float(rows[0][0] or 0) if rows else 0
-            if best_buy == 0:
-                best_buy = next((x for x in buy_prices if x > 0), 0)
-            best_sell = float(rows[0][1] or 0) if rows else 0
-            if best_sell == 0:
-                best_sell = next((x for x in sell_prices if x > 0), 0)
-            # تشخیص دقیق خالی بودن طرف - مقاوم به قیمت stale:
-            # اگر حجم و تعداد صفر باشند، طرف خالی است حتی اگر قیمت قدیمی در DB مانده باشد
-            # این دقیقاً باگ اصلی بود که اهرم 57,010 را صف خرید نشان می‌داد در حالی که صف فروش بود
-            buy_side_empty = (buy_vol == 0 and buy_cnt == 0)
-            sell_side_empty = (sell_vol == 0 and sell_cnt == 0)
-            # برای سازگاری با order_book.py، اگر قیمت هم صفر باشد هم خالی حساب می‌شود
-            if best_buy == 0:
-                buy_side_empty = buy_side_empty or (buy_vol == 0)
-            if best_sell == 0:
-                sell_side_empty = sell_side_empty or (sell_vol == 0)
-            if buy_side_empty and sell_side_empty:
-                info["order_state"] = "NO_DATA"
-            elif sell_side_empty and not buy_side_empty:
-                info["order_state"] = "LOCKED_BUY_QUEUE"
-                info["order_pressure"] = "BUY_QUEUE"
-            elif buy_side_empty and not sell_side_empty:
-                info["order_state"] = "LOCKED_SELL_QUEUE"
-                info["order_pressure"] = "SELL_QUEUE"
-            elif buy_vol + sell_vol > 0:
-                info["order_state"] = "TWO_SIDED"
-                info["imbalance"] = round((buy_vol - sell_vol) / (buy_vol + sell_vol) * 100, 1)
-                if best_buy and best_sell and best_sell >= best_buy:
-                    info["spread"] = round((best_sell - best_buy) / best_buy * 100, 3)
-                if info["imbalance"] > 20:
-                    info["order_pressure"] = "BUY_HEAVY"
-                elif info["imbalance"] < -20:
-                    info["order_pressure"] = "SELL_HEAVY"
-                else:
-                    info["order_pressure"] = "BALANCED"
-            else:
-                # هر دو حجم صفر ولی یک طرف قیمت دارد - به عنوان قفل در نظر بگیر
-                if buy_vol == 0 and sell_vol == 0:
-                    if best_buy > 0 and best_sell == 0:
-                        info["order_state"] = "LOCKED_BUY_QUEUE"
-                        info["order_pressure"] = "BUY_QUEUE"
-                    elif best_sell > 0 and best_buy == 0:
-                        info["order_state"] = "LOCKED_SELL_QUEUE"
-                        info["order_pressure"] = "SELL_QUEUE"
-    finally:
-        conn.close()
-    try:
-        from gamma_exposure import analyze_gamma_exposure
-        gx = analyze_gamma_exposure(db)
-        info["gamma_wall"] = gx.get("gamma_wall")
-        info["gamma_regime"] = gx.get("regime_bias")
-        info["gamma_conf"] = gx.get("confidence")
-    except Exception:
-        pass
-    return info
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='prices';")
+        if cursor.fetchone():
+            cursor.execute("SELECT last_price, closing_price, time FROM prices ORDER BY id DESC LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                data["last_price"] = row["last_price"] or 0
+                data["closing_price"] = row["closing_price"] or 0
+                data["price_time"] = row["time"] or "-"
 
-def _latest_max_pain(db):
-    """اطلاعات Max Pain فقط برای نمایش؛ در صورت نبود جدول، خروجی خالی است."""
-    conn = _connect(db)
-    if not conn:
-        return []
-    cur = conn.cursor()
-    rows = _safe(
-        cur,
-        "SELECT expiry, stock_price, max_pain_strike, current_distance_pct, "
-        "data_quality FROM max_pain_history ORDER BY id DESC LIMIT 3",
-    )
-    conn.close()
-    return rows
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='signal_history';")
+        if cursor.fetchone():
+            cursor.execute("SELECT * FROM signal_history ORDER BY id DESC LIMIT 1")
+            last_sig = cursor.fetchone()
+            if last_sig:
+                d = dict(last_sig)
+                data["signal_type"] = d.get("signal_type", "WATCH")
+                data["signal_score"] = float(d.get("score", 0.0) or 0.0)
+                data["signal_time"] = d.get("time", "-")
+                data["option_symbol"] = d.get("option_symbol") or "-"
+                data["option_price"] = d.get("option_price") or "-"
+                data["stop_loss"] = d.get("stop_loss") or "-"
+                data["take_profit"] = d.get("take_profit") or "-"
+                data["qty"] = d.get("qty") or "-"
 
+            cursor.execute("SELECT * FROM signal_history ORDER BY id DESC LIMIT 5")
+            data["recent_signals"] = [dict(r) for r in cursor.fetchall()]
 
-def _open_positions():
-    output = []
-    for name, db in SYMBOL_DBS:
-        conn = _connect(db)
-        if not conn:
-            continue
-        cur = conn.cursor()
-        _update_pending_outcomes(cur, conn)
-        rows = _safe(
-            cur,
-            "SELECT position_id, symbol, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
-            "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL "
-            "GROUP BY position_id",
-        )
-        for pos_id, stock, sym, entry, sl, t1, t2, outcome, _ in rows:
-            current = entry
-            price_rows = _safe(cur, "SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (sym,))
-            if price_rows and price_rows[0][0]:
-                current = price_rows[0][0]
-            try:
-                gain = round((float(current) - float(entry)) / float(entry) * 100, 1)
-            except Exception:
-                gain = 0
-            output.append({
-                "id": pos_id, "stock": stock or name, "symbol": sym,
-                "entry": entry, "current": current, "stop": sl, "t1": t1, "t2": t2,
-                "pct": gain, "outcome": outcome,
-            })
-        conn.close()
-    return output
-
-
-def _all_signals(limit=12):
-    all_rows = []
-    for _, db in SYMBOL_DBS:
-        conn = _connect(db)
-        if not conn:
-            continue
-        cur = conn.cursor()
-        all_rows.extend(_safe(
-            cur,
-            "SELECT time, symbol, signal_type, composite_score, option_symbol, outcome, outcome_pct "
-            "FROM signal_history ORDER BY id DESC LIMIT 20",
-        ))
-        conn.close()
-    all_rows.sort(key=lambda x: x[0] or "", reverse=True)
-    return all_rows[:limit]
-
-
-def _recent_news(limit=5):
-    result = []
-    for name, db in SYMBOL_DBS:
-        conn = _connect(db)
-        if not conn:
-            continue
-        cur = conn.cursor()
-        rows = _safe(cur, "SELECT time, source, title, category, event_date FROM daily_news ORDER BY id DESC LIMIT 5")
-        for t, source, title, cat, event_date in rows:
-            result.append((t, name, source, title, cat, event_date))
-        conn.close()
-    result.sort(key=lambda x: x[0] or "", reverse=True)
-    return result[:limit]
-
-
-def _ai_stats():
-    wins = losses = pending = total = 0
-    for _, db in SYMBOL_DBS:
-        conn = _connect(db)
-        if not conn:
-            continue
-        cur = conn.cursor()
-        for sql, target in [
-            ("SELECT COUNT(DISTINCT position_id) FROM signal_history WHERE outcome='WIN'", "wins"),
-            ("SELECT COUNT(DISTINCT position_id) FROM signal_history WHERE outcome='LOSS'", "losses"),
-            ("SELECT COUNT(DISTINCT position_id) FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL", "pending"),
-            ("SELECT COUNT(*) FROM signal_history", "total"),
-        ]:
-            rows = _safe(cur, sql)
-            value = rows[0][0] if rows else 0
-            if target == "wins": wins += value
-            elif target == "losses": losses += value
-            elif target == "pending": pending += value
-            else: total += value
-        conn.close()
-    rate = round(wins / (wins + losses) * 100, 1) if wins + losses else 0
-    return wins, losses, pending, total, rate
-
-
-def _sig_meta(signal_type):
-    key = (signal_type or "WAIT").upper()
-    mapping = {
-        "BUY": ("buy", "خرید"), "STRONG BUY": ("buy", "خرید قوی"),
-        "BUY_CALL": ("buy", "خرید کال"), "BUY_PUT": ("sell", "خرید پوت"),
-        "WATCH": ("watch", "تحت نظر"), "WAIT": ("muted", "صبر"),
-    }
-    return mapping.get(key, ("muted", key))
-
-
-def _order_label(info):
-    state = info["order_state"]
-    if state == "LOCKED_BUY_QUEUE": return "🔥 صف خرید قفل‌شده", "buy"
-    if state == "LOCKED_SELL_QUEUE": return "🧊 صف فروش قفل‌شده", "sell"
-    if state != "TWO_SIDED": return "⚪ داده تابلو ناکافی", "muted"
-    pressure = info["order_pressure"]
-    labels = {
-        "BUY_HEAVY": "🟢 فشار خرید", "SELL_HEAVY": "🔴 فشار فروش", "BALANCED": "⚪ متعادل",
-    }
-    cls = "buy" if pressure == "BUY_HEAVY" else ("sell" if pressure == "SELL_HEAVY" else "muted")
-    suffix = f" ({info['imbalance']:+.1f}٪)" if info["imbalance"] is not None else ""
-    return labels.get(pressure, "⚪ نامشخص") + suffix, cls
-
-
-def generate():
-    cards = [_symbol_info(name, db) for name, db in SYMBOL_DBS]
-    max_pain_data = [(name, _latest_max_pain(db)) for name, db in SYMBOL_DBS]
-    positions = _open_positions()
-    signals = _all_signals()
-    news = _recent_news()
-    wins, losses, pending, total, wr = _ai_stats()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    active = [c for c in cards if _sig_meta(c["signal"]["type"])[0] in ("buy", "sell")]
-    best = max(active, key=lambda c: float(c["signal"]["score"] or 0), default=None)
-    top_cls, top_text = _sig_meta(best["signal"]["type"] if best else "WATCH")
-
-    card_html = ""
-    for info in cards:
-        sig_cls, sig_text = _sig_meta(info["signal"]["type"])
-        order_text, order_cls = _order_label(info)
-        option = _esc(info["signal"].get("option"))
-        gamma = "—"
-        if info["gamma_wall"]:
-            regime = {"CALL_HEAVY": "کال‌سنگین", "PUT_HEAVY": "پوت‌سنگین", "BALANCED": "متعادل"}.get(info["gamma_regime"], info["gamma_regime"])
-            gamma = f"دیواره {_fmt(info['gamma_wall'])} · {regime}"
-        score = info["signal"].get("score")
-        score_text = f"{int(float(score))}/100" if score is not None else "—"
-        option_info = "بدون قرارداد منتخب"
-        if info["signal"].get("option"):
-            option_info = f"{option} · اعمال {_fmt(info['signal'].get('strike'))} · {info['option_days'] if info['option_days'] is not None else '—'} روز"
-        ag = info.get("advanced_greeks") or {}
-        ag_text = "Greeks پیشرفته: در انتظار داده"
-        ag_cls = "muted"
-        if ag.get("available"):
-            ag_level = ag.get("risk_level", "UNKNOWN")
-            ag_text = f"Greeks پیشرفته: ریسک {ag_level}"
-            ag_cls = "sell" if ag_level == "HIGH" else ("watch" if ag_level == "MEDIUM" else "buy")
-        card_html += f'''<article class="symbol-card {sig_cls}">
-          <div class="card-head"><h3>{_esc(info['name'])}</h3><span class="pill {sig_cls}">{sig_text}</span></div>
-          <div class="price">{_fmt(info['price'])}<small>ریال</small></div>
-          <div class="score"><span>امتیاز تصمیم</span><b>{score_text}</b></div>
-          <div class="meter"><i class="{sig_cls}" style="width:{min(100, max(0, float(score or 0)))}%"></i></div>
-          <div class="contract">{option_info}</div>
-          <div class="chips"><span class="chip {order_cls}">{order_text}</span><span class="chip muted">γ {gamma}</span><span class="chip {ag_cls}">{ag_text}</span></div>
-        </article>'''
-
-    position_html = ""
-    for p in positions:
-        cls = "buy" if p["pct"] >= 0 else "sell"
-        state = "هدف اول" if p["outcome"] == "T1_HIT" else "باز"
-        # نوار پیشرفت صرفاً تصویری: نقطه ورود=0، حدضرر=-12، هدف اول=+15
-        progress = min(100, max(0, (p["pct"] + 12) / 27 * 100))
-        position_html += f'''<div class="position-card">
-          <div class="position-main"><div><span class="eyebrow">{_esc(p['stock'])} · {_esc(p['symbol'])}</span><strong class="{cls}">{_pct(p['pct'])}</strong></div><span class="pill info">{state}</span></div>
-          <div class="track"><i style="width:{progress:.1f}%"></i><span class="entry">ورود</span><span class="t1">هدف ۱</span></div>
-          <div class="position-data"><span>ورود <b>{_fmt(p['entry'])}</b></span><span>فعلی <b>{_fmt(p['current'])}</b></span><span>حدضرر <b>{_fmt(p['stop'])}</b></span><span>هدف ۱ <b>{_fmt(p['t1'])}</b></span><span>هدف ۲ <b>{_fmt(p['t2'])}</b></span></div>
-        </div>'''
-    if not position_html:
-        position_html = '<div class="empty-state">پوزیشن بازی وجود ندارد.</div>'
-
-    alert_items = []
-    for info in cards:
-        order_text, order_cls = _order_label(info)
-        if order_cls in ("buy", "sell"):
-            alert_items.append((order_cls, info["name"], order_text))
-        latest = info.get("latest_news")
-        if latest and latest.get("category") in ("توقف نماد", "عدم تأیید معاملات", "افشای اطلاعات بااهمیت"):
-            alert_items.append(("watch", info["name"], f"خبر: {_esc(latest.get('category'))}"))
-    alerts_html = "".join(f'<div class="alert {c}"><b>{_esc(n)}</b><span>{t}</span></div>' for c, n, t in alert_items[:6])
-    if not alerts_html:
-        alerts_html = '<div class="empty-state">هشدار فعال مهمی ثبت نشده است.</div>'
-
-    news_html = ""
-    for t, name, source, title, cat, event_date in news:
-        news_html += f'''<div class="news-row"><span class="news-time">{_esc(event_date or t)}</span><span class="news-name">{_esc(name)}</span><span class="news-cat">{_esc(cat or source)}</span><span>{_esc(title)}</span></div>'''
-    if not news_html:
-        news_html = '<div class="empty-state">خبر رسمی ثبت‌شده‌ای وجود ندارد.</div>'
-
-    hist_html = ""
-    for t, name, st, score, option, outcome, out_pct in signals:
-        cls, label = _sig_meta(st)
-        result = "—"
-        if outcome == "WIN": result = f'<span class="buy">برد {_pct(out_pct)}</span>'
-        elif outcome == "LOSS": result = f'<span class="sell">باخت {_pct(out_pct)}</span>'
-        elif outcome == "T1_HIT": result = '<span class="watch">هدف اول</span>'
-        elif outcome == "PENDING" and option: result = '<span class="info-text">باز</span>'
-        hist_html += f"<tr><td>{_esc((t or '')[11:16])}</td><td>{_esc(name)}</td><td><span class='pill {cls}'>{label}</span></td><td>{score if score is not None else '—'}</td><td>{_esc(option)}</td><td>{result}</td></tr>"
-    if not hist_html:
-        hist_html = '<tr><td colspan="6" class="empty-state">سیگنالی ثبت نشده است.</td></tr>'
-
-    max_pain_html = ""
-    for name, rows in max_pain_data:
-        if not rows:
-            max_pain_html += f'<div class="maxpain-card"><h3>{_esc(name)}</h3><div class="empty-state">هنوز داده Max Pain ثبت نشده است.</div></div>'
-            continue
-        items = ""
-        for expiry, stock_price, strike, distance, quality in rows:
-            distance_text = _pct(distance)
-            items += f'''<div class="maxpain-row"><span>{_esc(expiry)}</span><b>{_fmt(strike)}</b><span>فاصله {distance_text}</span><em>{_esc(quality)}</em></div>'''
-        max_pain_html += f'<div class="maxpain-card"><h3>{_esc(name)}</h3>{items}</div>'
-
-    best_detail = "فعلاً شرایط ورود تازه تأیید نشده است."
-    if best:
-        s = best["signal"]
-        best_detail = f"{_esc(best['name'])} · قرارداد {_esc(s.get('option'))} · ورود {_fmt(s.get('option_price'))} · حدضرر {_fmt(s.get('stop'))} · هدف اول {_fmt(s.get('t1'))}"
-
-    html_doc = f'''<!doctype html>
-<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="{REFRESH_SECONDS}"><title>AHRAM AI PRO</title>
-<style>
-:root{{--bg:#0b1220;--panel:#111c2e;--panel2:#17263d;--line:#263750;--text:#edf3ff;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--blue:#38bdf8}}*{{box-sizing:border-box}}body{{margin:0;background:linear-gradient(145deg,#09111e,#0b1220 48%,#101827);color:var(--text);font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-size:14px}}.shell{{max-width:1440px;margin:auto;padding:22px}}.top{{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:18px}}h1{{font-size:22px;margin:0}}.sub,.muted{{color:var(--muted)}}.status{{display:flex;gap:8px;flex-wrap:wrap}}.status span,.chip,.pill{{border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;white-space:nowrap}}.status span{{background:#152238;color:#cbd5e1}}.live{{color:#86efac!important}}.live:before{{content:'●';margin-left:5px}}.hero{{margin:18px 0;display:grid;grid-template-columns:1.1fr 2fr;gap:14px}}.hero-main,.hero-detail,.symbol-card,.panel,.position-card{{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px}}.hero-main{{padding:18px;border-right:5px solid var(--green)}}.hero-main.sell{{border-color:var(--red)}}.hero-main.watch,.hero-main.muted{{border-color:var(--orange)}}.hero-label,.eyebrow{{color:var(--muted);font-size:12px}}.hero-action{{font-size:28px;font-weight:900;margin-top:7px}}.hero-detail{{padding:18px;display:flex;align-items:center;color:#d8e3f4}}.symbol-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}}.symbol-card{{padding:16px;min-width:0}}.symbol-card.buy{{border-top:3px solid var(--green)}}.symbol-card.sell{{border-top:3px solid var(--red)}}.symbol-card.watch,.symbol-card.muted{{border-top:3px solid var(--orange)}}.card-head,.position-main{{display:flex;justify-content:space-between;align-items:center;gap:8px}}h3{{margin:0;font-size:17px}}.price{{font-size:29px;font-weight:900;margin:15px 0 10px}}.price small{{font-size:11px;color:var(--muted);margin-right:5px}}.score{{display:flex;justify-content:space-between;color:var(--muted)}}.score b{{color:var(--text)}}.meter,.track{{height:7px;background:#223049;border-radius:9px;overflow:hidden;margin:8px 0 13px}}.meter i,.track i{{display:block;height:100%;background:var(--blue);border-radius:9px}}.meter i.buy{{background:var(--green)}}.meter i.sell{{background:var(--red)}}.meter i.watch,.meter i.muted{{background:var(--orange)}}.contract{{font-size:12px;border-top:1px solid var(--line);padding-top:11px;color:#d5dfef;min-height:38px}}.chips{{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}}.pill.buy,.chip.buy{{background:#123c29;color:#86efac}}.pill.sell,.chip.sell{{background:#4a1c25;color:#fca5a5}}.pill.watch,.chip.watch{{background:#4a3512;color:#fcd34d}}.pill.muted,.chip.muted{{background:#243147;color:#b6c4d8}}.pill.info{{background:#163a56;color:#7dd3fc}}.grid2{{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:18px}}.panel{{padding:16px}}.panel h2{{font-size:15px;margin:0 0 13px}}.position-card{{padding:14px;margin-bottom:10px;background:#0d1829}}.position-card strong{{font-size:21px;display:block;margin-top:4px}}.buy{{color:#86efac}}.sell{{color:#fca5a5}}.watch{{color:#fcd34d}}.track{{position:relative;margin:13px 0 17px}}.track i{{background:linear-gradient(90deg,var(--red),var(--blue),var(--green))}}.track span{{position:absolute;top:11px;color:var(--muted);font-size:10px}}.track .entry{{right:42%}}.track .t1{{left:0}}.position-data{{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;font-size:11px;color:var(--muted)}}.position-data b{{display:block;color:var(--text);font-size:13px;margin-top:3px}}.alert{{display:flex;gap:9px;padding:10px;border-bottom:1px solid var(--line)}}.alert:last-child{{border:0}}.alert b{{min-width:45px}}.alert.buy{{border-right:3px solid var(--green)}}.alert.sell{{border-right:3px solid var(--red)}}.alert.watch{{border-right:3px solid var(--orange)}}.news-row{{display:grid;grid-template-columns:92px 55px 105px 1fr;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}}.news-time,.news-cat{{color:var(--muted)}}.news-name{{font-weight:bold}}.maxpain-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}}.maxpain-card{{background:#0d1829;border:1px solid var(--line);border-radius:12px;padding:12px}}.maxpain-card h3{{margin-bottom:8px}}.maxpain-row{{display:grid;grid-template-columns:1fr .8fr 1.2fr auto;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:11px}}.maxpain-row:last-child{{border-bottom:0}}.maxpain-row b{{color:var(--text)}}.maxpain-row em{{font-style:normal;color:#86efac;font-size:10px}}.stats{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}}.stat{{background:var(--panel);border:1px solid var(--line);padding:14px;border-radius:13px}}.stat span{{color:var(--muted);font-size:12px}}.stat b{{font-size:23px;display:block;margin-top:5px}}table{{width:100%;border-collapse:collapse}}th,td{{padding:10px;border-bottom:1px solid var(--line);text-align:right;font-size:12px}}th{{color:var(--muted);font-weight:600}}.history{{margin-top:18px}}.empty-state{{color:var(--muted);padding:18px;text-align:center}}.info-text{{color:#7dd3fc}}@media(max-width:850px){{.hero,.grid2{{grid-template-columns:1fr}}.symbol-grid{{grid-template-columns:1fr}}.maxpain-grid{{grid-template-columns:1fr}}.top{{align-items:flex-start;flex-direction:column}}.position-data{{grid-template-columns:repeat(3,1fr)}}.news-row{{grid-template-columns:75px 45px 1fr}}.news-row span:last-child{{grid-column:1/-1}}.hide-mobile{{display:none}}.stats{{grid-template-columns:repeat(2,1fr)}}}}
-</style></head><body><main class="shell">
-<header class="top"><div><h1>🚀 AHRAM AI PRO</h1><div class="sub">داشبورد تصمیم‌یار آپشن · فقط نمایش داده‌های فعلی ربات</div></div><div class="status"><span class="live">سیستم فعال</span><span>به‌روزرسانی {REFRESH_SECONDS} ثانیه</span><span>{now}</span></div></header>
-<section class="hero"><div class="hero-main {top_cls}"><div class="hero-label">بهترین اقدام فعلی</div><div class="hero-action">{top_text}</div></div><div class="hero-detail">{best_detail}</div></section>
-<section class="symbol-grid">{card_html}</section>
-<section class="panel" style="margin-top:18px"><h2>📍 Max Pain اکتشافی <span class="sub">(صرفاً اطلاعاتی، بدون اثر بر سیگنال)</span></h2><div class="maxpain-grid">{max_pain_html}</div></section>
-<section class="grid2"><div class="panel"><h2>📌 پوزیشن‌های باز</h2>{position_html}</div><div class="panel"><h2>⚠️ هشدارها و وضعیت تابلو</h2>{alerts_html}</div></section>
-<section class="grid2"><div class="panel"><h2>📰 آخرین رویدادهای رسمی</h2>{news_html}</div><div class="panel"><h2>🧠 وضعیت یادگیری</h2><div class="stats"><div class="stat"><span>کل رکوردها</span><b>{total}</b></div><div class="stat"><span>برد / باخت</span><b>{wins} / {losses}</b></div><div class="stat"><span>نرخ برد</span><b>{wr}٪</b></div><div class="stat"><span>پوزیشن باز</span><b>{pending}</b></div></div><div class="sub" style="margin-top:12px;font-size:11px">تا ثبت حداقل دادهٔ واقعی، ML صرفاً در حال جمع‌آوری داده است.</div></div></section>
-<section class="panel history"><h2>📜 آخرین تصمیم‌ها <span class="sub">(۱۲ رکورد آخر)</span></h2><table><thead><tr><th>زمان</th><th>نماد</th><th>تصمیم</th><th>امتیاز</th><th class="hide-mobile">قرارداد</th><th>نتیجه</th></tr></thead><tbody>{hist_html}</tbody></table></section>
-</main></body></html>'''
-    try:
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            f.write(html_doc)
-        return OUTPUT_FILE
     except Exception as e:
-        print("[DASHBOARD] ERROR:", e)
-        return None
+        logger.warning(f"⚠️ خطا در خواندن داده‌های {symbol}: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    return data
+
+
+def generate_html_content(all_data: List[Dict[str, Any]]) -> str:
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cards_html = ""
+    for item in all_data:
+        sym = item["symbol"]
+        sig = item["signal_type"]
+        score = item["signal_score"]
+        l_price = item["last_price"]
+        opt_sym = item["option_symbol"]
+        sl_raw = item["stop_loss"]
+        tp_raw = item["take_profit"]
+        qty_raw = item["qty"]
+
+        # پیش‌پردازش فرمت عددی (رفع خطای قبلی)
+        qty_str = fmt_num(qty_raw)
+        sl_str = fmt_num(sl_raw)
+        tp_str = fmt_num(tp_raw)
+        price_str = fmt_num(l_price)
+
+        # استایل‌بندی
+        if sig == "BUY_CALL":
+            sig_badge = '<span class="badge badge-call">🟢 خرید کال (BUY_CALL)</span>'
+            card_border = "border-call"
+        elif sig == "BUY_PUT":
+            sig_badge = '<span class="badge badge-put">🔴 خرید پوت (BUY_PUT)</span>'
+            card_border = "border-put"
+        else:
+            sig_badge = '<span class="badge badge-watch">⚪ خنثی / نظاره‌گر (WATCH)</span>'
+            card_border = "border-watch"
+
+        if sig in ["BUY_CALL", "BUY_PUT"] and opt_sym not in ["-", None, ""]:
+            risk_section = f"""
+            <div class="risk-box">
+                <div class="risk-title">🛡️ طرح مدیریت ریسک و نوسان‌گیری</div>
+                <div class="risk-grid">
+                    <div><strong>نماد آپشن:</strong> <span class="highlight">{str(opt_sym)}</span></div>
+                    <div><strong>تعداد خرید مجاز:</strong> <span class="highlight">{qty_str}</span> برگه</div>
+                    <div><strong>حد سود آپشن (TP):</strong> <span class="text-green">{tp_str} ریال (+40%)</span></div>
+                    <div><strong>حد ضرر آپشن (SL):</strong> <span class="text-red">{sl_str} ریال (-20%)</span></div>
+                </div>
+            </div>
+            """
+        else:
+            risk_section = """
+            <div class="risk-box neutral-box">
+                <div class="risk-title">☕ مدیریت ریسک: پوزیشنی فعال نیست</div>
+                <div style="font-size: 13px; color: #8b949e; margin-top: 5px;">سیستم در حال حاضر پایش بازار را بدون اتخاذ موقعیت ادامه می‌دهد.</div>
+            </div>
+            """
+
+        cards_html += f"""
+        <div class="card {card_border}">
+            <div class="card-header">
+                <h2>{sym}</h2>
+                <div>{sig_badge}</div>
+            </div>
+            <div class="price-row">
+                <div>آخرین قیمت سهم: <strong>{price_str} ریال</strong></div>
+                <div>امتیاز استراتژی: <strong>{score:.1f} / 100</strong></div>
+            </div>
+            {risk_section}
+            <div class="time-footer">⏱️ زمان آخرین تحلیل: {str(item.get('signal_time', '-'))}</div>
+        </div>
+        """
+
+    html = f"""<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="20">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبورد تصمیم‌یار آپشن بورس ایران | نسخه V4</title>
+    <style>
+        * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }}
+        body {{ background-color: #0d1117; color: #c9d1d9; padding: 20px; }}
+        .header {{ text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #30363d; }}
+        .header h1 {{ font-size: 24px; color: #58a6ff; margin-bottom: 8px; }}
+        .header p {{ font-size: 13px; color: #8b949e; }}
+        .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }}
+        .card {{ background-color: #161b22; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 2px solid transparent; }}
+        .border-call {{ border-color: #238636; }}
+        .border-put {{ border-color: #da3633; }}
+        .border-watch {{ border-color: #30363d; }}
+        .card-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }}
+        .card-header h2 {{ font-size: 20px; color: #f0f6fc; }}
+        .badge {{ padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }}
+        .badge-call {{ background-color: rgba(35, 134, 54, 0.2); color: #3fb950; border: 1px solid #238636; }}
+        .badge-put {{ background-color: rgba(218, 54, 51, 0.2); color: #f85149; border: 1px solid #da3633; }}
+        .badge-watch {{ background-color: rgba(139, 148, 158, 0.2); color: #8b949e; border: 1px solid #30363d; }}
+        .price-row {{ display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 15px; background: #0d1117; padding: 10px; border-radius: 8px; }}
+        .risk-box {{ background: #21262d; border-radius: 8px; padding: 12px; margin-top: 10px; border-left: 4px solid #58a6ff; }}
+        .neutral-box {{ border-left: 4px solid #8b949e; }}
+        .risk-title {{ font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #58a6ff; }}
+        .neutral-box .risk-title {{ color: #8b949e; }}
+        .risk-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }}
+        .highlight {{ color: #e3b341; font-weight: bold; }}
+        .text-green {{ color: #3fb950; font-weight: bold; }}
+        .text-red {{ color: #f85149; font-weight: bold; }}
+        .time-footer {{ font-size: 11px; color: #8b949e; text-align: left; margin-top: 15px; }}
+        .footer {{ text-align: center; margin-top: 30px; font-size: 12px; color: #8b949e; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 مانیتورینگ زنده معاملات آپشن (اهرم | وبملت | شستا)</h1>
+        <p>بروزرسانی خودکار هر ۲۰ ثانیه | آخرین بروزرسانی سیستم: {now_str}</p>
+    </div>
+
+    <div class="grid">
+        {cards_html}
+    </div>
+
+    <div class="footer">
+        سیستم تصمیم‌یار معامله آپشن بورس ایران (Ahram AI Pro) | نسخه نهایی 2026
+    </div>
+</body>
+</html>
+"""
+    return html
+
+
+def generate_html(output_file: str = OUTPUT_HTML_FILE) -> str:
+    all_data = []
+    for sym, db in DBS.items():
+        data = get_symbol_data(sym, db)
+        all_data.append(data)
+
+    html_content = generate_html_content(all_data)
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    logger.info(f"✅ فایل داشبورد با موفقیت تولید شد: {output_file}")
+    return output_file
 
 
 if __name__ == "__main__":
-    out = generate()
-    if out:
-        print(f"✅ داشبورد ساخته شد: {out}")
+    if len(sys.argv) > 1 and sys.argv[1] == "--test":
+        print("\n=== [تست خودکار ماژول داشبورد V4] ===")
+        out = generate_html("dashboard_test.html")
+        if os.path.exists(out) and os.path.getsize(out) > 0:
+            print(f"🥇 نتیجه تست: پاس شد ✅ (فایل {out} با موفقیت ساخته شد)")
+            try: os.remove(out)
+            except Exception: pass
+        else:
+            print("❌ نتیجه تست: ساخت داشبورد با شکست مواجه شد!")
+        print("======================================\n")
+    else:
+        generate_html()

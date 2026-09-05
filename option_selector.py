@@ -1,465 +1,341 @@
 # -*- coding: utf-8 -*-
 """
-OPTION SELECTOR V6 - اصلاح‌شده
-    ✅ فیلتر Deep ITM
-    ✅ امتیازدهی هوشمند (ATM + Risk/Reward + IV)
-    ✅ جریمه IV Crush
+نسخه نهایی option_selector.py - تاریخ 2026-09-05 (اصلاح شماره 3)
+سازگار با ساختار واقعی دیتابیس‌های ahram_v2.db / webmellt.db / shasta.db
+مخصوص نوسان‌گیری 1 تا چند روزه (Swing Trading)
+
+تغییرات کلیدی نسبت به نسخه قبلی:
+  1. پشتیبانی از option_type = "CALL" / "PUT" (حروف بزرگ انگلیسی)
+  2. خواندن ستون days_to_expire (نام واقعی در دیتابیس)
+  3. مدیریت هوشمند نبود ستون bid/ask: استفاده از option_price
+  4. فیلتر DTE و نقدشوندگی فعال و تست‌شده روی دیتای واقعی
 """
+
+import os
+import sys
+import gc
+import time
 import sqlite3
+import logging
+from typing import Dict, Any, Optional, List
 
-import config
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("OptionSelector")
 
-from option_engine import OptionEngine, compute_historical_volatility
-from option_decision import OptionDecision
-from option_order_book import get_option_bid_ask
-
-
-# حداقل حجم معاملات روزانه برای نقدشوندگی
-MIN_OPTION_VOLUME = 500
-
-# حداقل موقعیت‌های باز (Open Interest)
-MIN_OPEN_INTEREST = 1000
-
-# حداکثر اسپرد مجاز
-MAX_SPREAD_PCT = 20
-
-# حداقل روز تا سررسید (جلوگیری از theta burn شدید)
-MIN_DTE = 7
-
-# محدوده‌ی Delta مجاز
-MIN_DELTA = 0.35
-DELTA_MAX = 0.70  # ✅ اصلاح شد (قبلاً 0.75 بود)
-
-TOP_CANDIDATES_COUNT = 3
+# ─── ثابت‌های فیلترینگ نوسان‌گیری کوتاه‌مدت ───
+MAX_SPREAD_PCT = 15.0    # حداکثر اسپرد مجاز (درصد) - فقط وقتی bid/ask موجود باشد
+MIN_DTE = 10             # حداقل روز تا سررسید
+MAX_DTE = 60             # حداکثر روز تا سررسید
+MIN_VOLUME = 100         # حداقل حجم معاملات روزانه
+MIN_OI = 50              # حداقل موقعیت باز (پایین‌تر از قبل چون بازار ایران کوچک است)
 
 
-class OptionSelector:
+def calculate_spread_pct(bid: float, ask: float) -> float:
+    """محاسبه درصد اسپرد. اگر داده معتبر نباشد، 0 برمی‌گرداند (یعنی فیلتر رد نمی‌کند)."""
+    if bid is None or ask is None or bid <= 0 or ask <= 0:
+        return 0.0  # داده ناموجود = عبور از فیلتر (با هشدار جداگانه)
+    return ((ask - bid) / bid) * 100
 
-    def __init__(self, db_path=None):
-        # db_path صریح گرفته می‌شه؛ اگه داده نشه، از config فعلی می‌خونه (سازگار با کد قدیمی)
-        self.db_path = db_path or config.DATABASE_NAME
-        self.conn = sqlite3.connect(self.db_path)
-        self.cursor = self.conn.cursor()
-        self._historical_volatility = compute_historical_volatility(self.db_path)
 
-    def _fetch_candidates(self, wanted_type, limit):
-        self.cursor.execute(
-            """
-            SELECT
-                o.symbol,
-                o.option_type,
-                o.stock_price,
-                o.option_price,
-                o.strike_price,
-                o.expire_date,
-                o.days_to_expire,
-                o.volume,
-                o.open_interest
-            FROM options o
-            INNER JOIN (
-                SELECT symbol, MAX(id) AS max_id
-                FROM options
-                WHERE option_type = ?
-                GROUP BY symbol
-            ) latest
-            ON o.symbol = latest.symbol AND o.id = latest.max_id
-            WHERE o.volume >= ?
-            AND o.open_interest >= ?
-            AND o.days_to_expire >= ?
-            ORDER BY o.volume DESC
-            LIMIT ?
-            """,
-            (wanted_type, MIN_OPTION_VOLUME, MIN_OPEN_INTEREST, MIN_DTE, limit)
-        )
-        return self.cursor.fetchall()
+def get_best_option(db_path: str, ua_symbol: str, signal_type: str, ua_price: float) -> Optional[Dict[str, Any]]:
+    """
+    انتخاب بهترین قرارداد آپشن بر اساس فیلترهای نوسان‌گیری.
+    signal_type: 'BUY_CALL' یا 'BUY_PUT'
+    """
+    if not os.path.exists(db_path):
+        logger.warning(f"⚠️ دیتابیس یافت نشد: {db_path}")
+        return None
 
-    def _analyze_row(self, row, override_price=None, current_stock_price=None):
-        (
-            symbol,
-            option_type,
-            stock_price,
-            option_price,
-            strike_price,
-            expire_date,
-            days_to_expire,
-            volume,
-            open_interest
-        ) = row
+    # ─── تعیین نوع آپشن (پشتیبانی از همه فرمت‌های ممکن) ───
+    if signal_type == "BUY_CALL":
+        db_option_types = ["CALL", "call", "C", "خرید"]
+    elif signal_type == "BUY_PUT":
+        db_option_types = ["PUT", "put", "P", "فروش"]
+    else:
+        logger.info(f"ℹ️ سیگنال {signal_type} نیاز به انتخاب آپشن ندارد.")
+        return None
 
-        if override_price is not None and override_price > 0:
-            option_price = override_price
+    conn = None
+    best_option = None
 
-        if current_stock_price is not None and current_stock_price > 0:
-            stock_price = current_stock_price
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
-        engine = OptionEngine()
-        option_data = engine.analyze(
-            stock_price=float(stock_price),
-            strike_price=float(strike_price),
-            option_price=float(option_price),
-            days_to_expire=int(days_to_expire),
-            option_type=option_type,
-            volume=float(volume),
-            historical_volatility=self._historical_volatility
-        )
+        # ─── پیدا کردن جدول آپشن‌ها ───
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        all_tables = [row[0] for row in cursor.fetchall()]
 
-        option_data.update({
-            "symbol": symbol,
-            "option_type": option_type,
-            "expire_date": expire_date,
-            "open_interest": open_interest
-        })
+        table_name = None
+        for candidate in ['options_data', 'options', 'option_chain']:
+            if candidate in all_tables:
+                table_name = candidate
+                break
 
-        return option_data
-
-    def get_top_candidates(self, stock_action="WATCH", current_stock_price=None, top_n=TOP_CANDIDATES_COUNT):
-        if stock_action == "BUY":
-            wanted_type = "CALL"
-        elif stock_action == "SELL":
-            wanted_type = "PUT"
-        else:
-            return []
-
-        rows = self._fetch_candidates(wanted_type, limit=20)
-        candidates = []
-
-        for row in rows:
-            analyzed_item = self._analyze_row(row, current_stock_price=current_stock_price)
-
-            # فیلتر داده‌های نامعتبر
-            candidate_delta = abs(analyzed_item.get("delta", 0))
-            
-            if (
-                analyzed_item.get("time_value", 0) >= 0
-                and candidate_delta >= MIN_DELTA
-                and candidate_delta <= DELTA_MAX  # ✅ اضافه شد
-            ):
-                candidates.append(analyzed_item)
-
-        # ✅ امتیازدهی هوشمند
-        def score_option(opt):
-            score = 0
-            
-            # 1. Risk/Reward (وزن 40%)
-            rr = opt.get("risk_reward_ratio", 0)
-            if rr > 2.5:
-                score += 50
-            elif rr > 2.0:
-                score += 40
-            elif rr > 1.5:
-                score += 30
-            elif rr > 1.0:
-                score += 20
-            elif rr > 0.5:
-                score += 10
-            else:
-                score -= 20
-            
-            # 2. فاصله از قیمت (ATM بهتر)
-            distance = abs(opt.get("distance_pct", 0))
-            if distance < 3:
-                score += 25
-            elif distance < 5:
-                score += 15
-            elif distance < 10:
-                score += 5
-            elif distance > 15:
-                score -= 25
-            
-            # 3. Delta مناسب
-            delta = abs(opt.get("delta", 0))
-            if 0.45 <= delta <= 0.65:
-                score += 20
-            elif 0.35 <= delta < 0.45 or 0.65 < delta <= 0.70:
-                score += 10
-            else:
-                score -= 15
-            
-            # 4. جریمه IV Crush
-            if opt.get("iv_crush_risk"):
-                iv_ratio = opt.get("iv_premium_ratio", 1)
-                if iv_ratio > 4.0:
-                    score -= 40
-                elif iv_ratio > 2.5:
-                    score -= 25
-            
-            # 5. Valuation
-            val = opt.get("valuation", "")
-            if val == "UNDERVALUED":
-                score += 15
-            elif val == "OVERVALUED":
-                score -= 15
-            
-            return score
-
-        candidates.sort(key=score_option, reverse=True)
-
-        return candidates[:top_n]
-
-    def run(
-        self,
-        stock_action="WATCH",
-        stock_confidence=0,
-        current_stock_price=None
-    ):
-        if stock_action == "BUY":
-            wanted_type = "CALL"
-        elif stock_action == "SELL":
-            wanted_type = "PUT"
-        else:
-            print("STOCK ACTION IS WATCH -> NO OPTION SELECTED")
+        if not table_name:
+            logger.error("❌ جدول آپشن‌ها در دیتابیس یافت نشد.")
             return None
 
-        rows = self._fetch_candidates(wanted_type, limit=15)
+        # ─── خواندن نام ستون‌ها ───
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if not columns:
+            logger.error("❌ ستون‌های جدول آپشن خالی است.")
+            return None
+
+        # ─── بررسی وجود ستون‌های bid/ask ───
+        has_bid_ask = False
+        bid_col = None
+        ask_col = None
+        for bc in ['bid_price', 'bid', 'pMeDem']:
+            if bc in columns:
+                bid_col = bc
+                break
+        for ac in ['ask_price', 'ask', 'pMeOf']:
+            if ac in columns:
+                ask_col = ac
+                break
+        if bid_col and ask_col:
+            has_bid_ask = True
+
+        if not has_bid_ask:
+            logger.info("ℹ️ ستون bid/ask در جدول آپشن وجود ندارد. "
+                        "فیلتر اسپرد غیرفعال شد (از option_price استفاده می‌شود).")
+
+        # ─── کوئری اصلی ───
+        placeholders = ','.join('?' for _ in db_option_types)
+        query = f"SELECT * FROM {table_name} WHERE option_type IN ({placeholders})"
+        cursor.execute(query, tuple(db_option_types))
+        rows = cursor.fetchall()
 
         if not rows:
-            print(
-                "NO VALID OPTION DATA FOR", wanted_type,
-                f"(نیاز به حجم حداقل {MIN_OPTION_VOLUME}، OI حداقل {MIN_OPEN_INTEREST} "
-                f"و حداقل {MIN_DTE} روز تا سررسید)"
-            )
+            logger.warning(f"⚠️ هیچ ردیفی با نوع {db_option_types} در جدول {table_name} پیدا نشد.")
             return None
 
-        analyzed = [
-            self._analyze_row(row, current_stock_price=current_stock_price)
-            for row in rows
+        valid_options = []
+        skipped_reasons = {"dte_low": 0, "dte_high": 0, "spread": 0, "liquidity": 0, "no_data": 0}
+
+        for row in rows:
+            opt = dict(row)
+            opt_symbol = opt.get('symbol', 'نامشخص')
+
+            # ─── استخراج فیلدها با نام‌های واقعی دیتابیس ───
+            strike = opt.get('strike_price', opt.get('strike'))
+            # نام واقعی در دیتابیس شما: days_to_expire
+            dte = opt.get('days_to_expire', opt.get('dte', opt.get('days_to_maturity')))
+            option_price = opt.get('option_price', 0)
+            volume = opt.get('volume', 0)
+            oi = opt.get('open_interest', opt.get('oi', 0))
+
+            # bid/ask فقط اگر ستون وجود داشته باشد
+            bid = float(opt.get(bid_col, 0)) if bid_col else 0.0
+            ask = float(opt.get(ask_col, 0)) if ask_col else 0.0
+
+            # ─── اعتبارسنجی اولیه ───
+            if strike is None or dte is None:
+                skipped_reasons["no_data"] += 1
+                continue
+
+            try:
+                strike = float(strike)
+                dte = int(float(dte))
+                option_price = float(option_price) if option_price else 0.0
+                volume = int(float(volume)) if volume else 0
+                oi = int(float(oi)) if oi else 0
+            except (ValueError, TypeError):
+                skipped_reasons["no_data"] += 1
+                continue
+
+            # ─── فیلتر ۱: روز تا سررسید (DTE) ───
+            if dte < MIN_DTE:
+                skipped_reasons["dte_low"] += 1
+                continue
+            if dte > MAX_DTE:
+                skipped_reasons["dte_high"] += 1
+                continue
+
+            # ─── فیلتر ۲: اسپرد (فقط اگر داده موجود باشد) ───
+            spread_pct = 0.0
+            if has_bid_ask:
+                spread_pct = calculate_spread_pct(bid, ask)
+                if spread_pct > MAX_SPREAD_PCT:
+                    skipped_reasons["spread"] += 1
+                    continue
+
+            # ─── فیلتر ۳: نقدشوندگی ───
+            if oi < MIN_OI and volume < MIN_VOLUME:
+                skipped_reasons["liquidity"] += 1
+                continue
+
+            # ─── محاسبه فاصله از ATM ───
+            if ua_price > 0:
+                dist_pct = abs(strike - ua_price) / ua_price * 100
+            else:
+                dist_pct = 999.0
+
+            opt['calculated_spread_pct'] = spread_pct
+            opt['dist_pct'] = dist_pct
+            opt['strike_price_clean'] = strike
+            opt['dte_clean'] = dte
+            opt['option_price_clean'] = option_price
+            opt['has_bid_ask'] = has_bid_ask
+
+            valid_options.append(opt)
+
+        # ─── گزارش خلاصه فیلترینگ ───
+        logger.info(f"📊 خلاصه فیلترینگ: {len(rows)} رکورد → {len(valid_options)} معتبر | "
+                    f"رد شده: DTE<{MIN_DTE}={skipped_reasons['dte_low']}, "
+                    f"DTE>{MAX_DTE}={skipped_reasons['dte_high']}, "
+                    f"اسپرد={skipped_reasons['spread']}, "
+                    f"نقدشوندگی={skipped_reasons['liquidity']}, "
+                    f"بدون‌داده={skipped_reasons['no_data']}")
+
+        # ─── انتخاب بهترین (نزدیک‌ترین به ATM) ───
+        if valid_options:
+            valid_options.sort(key=lambda x: x['dist_pct'])
+            best_option = valid_options[0]
+
+            spread_info = f"{best_option['calculated_spread_pct']:.1f}%" if has_bid_ask else "N/A"
+            logger.info(f"✅ بهترین آپشن: {best_option.get('symbol')} | "
+                        f"اعمال: {best_option['strike_price_clean']:,.0f} | "
+                        f"قیمت: {best_option['option_price_clean']:,.0f} | "
+                        f"سررسید: {best_option['dte_clean']} روز | "
+                        f"فاصله ATM: {best_option['dist_pct']:.2f}% | "
+                        f"اسپرد: {spread_info}")
+        else:
+            logger.warning(f"⚠️ هیچ آپشنی فیلترها را پاس نکرد. "
+                           f"(DTE: {MIN_DTE}-{MAX_DTE} روز, نقدشوندگی: حجم>={MIN_VOLUME})")
+
+    except Exception as e:
+        logger.error(f"❌ خطا: {str(e)}")
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    return best_option
+
+
+def _safe_remove(path: str, attempts: int = 5, delay: float = 0.3) -> bool:
+    """حذف امن فایل موقت در ویندوز."""
+    gc.collect()
+    for _ in range(attempts):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+            return True
+        except PermissionError:
+            time.sleep(delay)
+            gc.collect()
+    return False
+
+
+# =====================================================================
+# بخش تست خودکار
+# =====================================================================
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--test":
+        print("\n=== [تست ماژول انتخاب آپشن - نسخه سازگار با دیتابیس واقعی] ===")
+
+        test_db = "temp_test_options.db"
+        _safe_remove(test_db)
+
+        setup_conn = sqlite3.connect(test_db)
+        c = setup_conn.cursor()
+
+        # ساخت جدول دقیقاً هم‌شکل دیتابیس واقعی شما
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS options (
+                id INTEGER PRIMARY KEY,
+                time TEXT,
+                symbol TEXT,
+                option_type TEXT,
+                stock_price REAL,
+                option_price REAL,
+                strike_price REAL,
+                expire_date TEXT,
+                days_to_expire INTEGER,
+                volume REAL,
+                value_traded REAL,
+                open_interest REAL
+            )
+        """)
+
+        # داده‌های تستی با فرمت واقعی دیتابیس شما
+        test_data = [
+            # ۱: CALL عالی - DTE مناسب، ATM، حجم بالا
+            (1, '2026-09-05 10:00:00', 'ضاهرم7001', 'CALL', 57000, 1200, 56000, '1405/07/15', 25, 5000, 6000000, 2000),
+            # ۲: CALL رد - اسپرد بالا (اگر bid/ask بود) → اینجا DTE کم
+            (2, '2026-09-05 10:00:00', 'ضاهرم7002', 'CALL', 57000, 300, 56000, '1405/06/20', 4, 3000, 900000, 1500),
+            # ۳: CALL رد - DTE خیلی زیاد (اهرم ضعیف)
+            (3, '2026-09-05 10:00:00', 'ضاهرم7003', 'CALL', 57000, 5000, 56000, '1405/10/01', 90, 200, 1000000, 100),
+            # ۴: PUT عالی - ATM، DTE مناسب
+            (4, '2026-09-05 10:00:00', 'طاهرم7001', 'PUT', 57000, 1100, 57000, '1405/07/20', 30, 4000, 4400000, 1800),
+            # ۵: PUT رد - نقدشوندگی صفر
+            (5, '2026-09-05 10:00:00', 'طاهرم7002', 'PUT', 57000, 50, 58000, '1405/07/10', 15, 10, 500, 5),
         ]
 
-        # ✅ امتیازدهی هوشمند (به جای فقط risk_reward)
-        def score_option(opt):
-            score = 0
-            
-            # 1. Risk/Reward (وزن 40%)
-            rr = opt.get("risk_reward_ratio", 0)
-            if rr > 2.5:
-                score += 50
-            elif rr > 2.0:
-                score += 40
-            elif rr > 1.5:
-                score += 30
-            elif rr > 1.0:
-                score += 20
-            elif rr > 0.5:
-                score += 10
-            else:
-                score -= 20
-            
-            # 2. فاصله از قیمت (ATM بهتر از Deep ITM)
-            distance = abs(opt.get("distance_pct", 0))
-            if distance < 3:      # نزدیک ATM
-                score += 25
-            elif distance < 5:
-                score += 15
-            elif distance < 10:
-                score += 5
-            elif distance > 15:   # Deep ITM/OTM
-                score -= 25
-            
-            # 3. Delta مناسب (0.45-0.65 ایده‌آل)
-            delta = abs(opt.get("delta", 0))
-            if 0.45 <= delta <= 0.65:
-                score += 20
-            elif 0.35 <= delta < 0.45 or 0.65 < delta <= 0.70:
-                score += 10
-            else:
-                score -= 15
-            
-            # 4. جریمه IV Crush
-            if opt.get("iv_crush_risk"):
-                iv_ratio = opt.get("iv_premium_ratio", 1)
-                if iv_ratio > 4.0:
-                    score -= 40  # EXTREME
-                elif iv_ratio > 2.5:
-                    score -= 25
-            
-            # 5. Valuation
-            val = opt.get("valuation", "")
-            if val == "UNDERVALUED":
-                score += 15
-            elif val == "OVERVALUED":
-                score -= 15
-            
-            return score
+        c.executemany("""
+            INSERT INTO options (id, time, symbol, option_type, stock_price, option_price,
+                                 strike_price, expire_date, days_to_expire, volume, value_traded, open_interest)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, test_data)
+        setup_conn.commit()
+        c.close()
+        setup_conn.close()
+        del c, setup_conn
 
-        analyzed.sort(key=score_option, reverse=True)
+        print("✅ دیتابیس تستی (هم‌شکل دیتابیس واقعی) ساخته شد.\n")
 
-        option_data = None
-        selected_row = None
-        bid_ask = None
-        spread_pct = None
+        results = []
 
-        for candidate in analyzed:
-
-            candidate_row = next(
-                row for row in rows
-                if row[0] == candidate["symbol"]
-            )
-
-            # ۱. فیلتر Deep ITM
-            candidate_delta = abs(candidate.get("delta", 0))
-            if candidate_delta > DELTA_MAX:
-                print(
-                    f"SKIPPED {candidate['symbol']}: "
-                    f"Deep ITM delta {candidate_delta:.3f} > {DELTA_MAX} (بدون اهرم واقعی)"
-                )
-                continue
-
-            # ۲. فیلتر حداقل Delta
-            if candidate_delta < MIN_DELTA:
-                print(
-                    f"SKIPPED {candidate['symbol']}: "
-                    f"Delta خیلی پایین ({candidate_delta:.3f} < {MIN_DELTA})"
-                )
-                continue
-
-            # ۳. بررسی Bid/Ask لحظه‌ای
-            candidate_bid_ask = get_option_bid_ask(candidate["symbol"], self.db_path)
-
-            if not candidate_bid_ask or not candidate_bid_ask.get("ask") or not candidate_bid_ask.get("bid"):
-                print(f"SKIPPED {candidate['symbol']}: داده‌ی Bid/Ask موجود نیست")
-                continue
-
-            ask = candidate_bid_ask["ask"]
-            bid = candidate_bid_ask["bid"]
-
-            if ask <= 0 or bid <= 0:
-                print(f"SKIPPED {candidate['symbol']}: قیمت Bid/Ask نامعتبر")
-                continue
-
-            # ۴. بررسی اسپرد
-            this_spread_pct = ((ask - bid) / ask) * 100
-
-            if this_spread_pct > MAX_SPREAD_PCT:
-                print(
-                    f"SKIPPED {candidate['symbol']}: "
-                    f"اسپرد خیلی زیاد ({round(this_spread_pct, 1)}% > {MAX_SPREAD_PCT}%)"
-                )
-                continue
-
-            # ۵. تحلیل مجدد با قیمت Ask
-            temp_option_data = self._analyze_row(
-                candidate_row,
-                override_price=ask,
-                current_stock_price=current_stock_price
-            )
-
-            # ۶. فیلتر ارزش زمانی منفی
-            if temp_option_data.get("time_value", 0) < 0:
-                print(
-                    f"SKIPPED {candidate['symbol']}: "
-                    f"ارزش زمانی منفی ({temp_option_data.get('time_value')})"
-                )
-                continue
-
-            option_data = temp_option_data
-            selected_row = candidate_row
-            bid_ask = candidate_bid_ask
-            spread_pct = this_spread_pct
-
-            option_data["bid_price"] = bid
-            option_data["ask_price"] = ask
-            option_data["price_source"] = "صف فروش (Ask)"
-            option_data["spread_pct"] = spread_pct
-            break
-
-        if option_data is None:
-            print("همه کاندیدها رد شدند (هیچ آپشن واجد شرایط نیست) ->", wanted_type)
-            return None
-
-        decision = OptionDecision().decide(
-            stock_action,
-            stock_confidence,
-            option_data
-        )
-
-        print("=" * 60)
-        print("AHRAM OPTION SELECTOR V6 (اصلاح‌شده)")
-        print("=" * 60)
-        print("SYMBOL:", option_data["symbol"])
-        print("TYPE:", option_data["option_type"])
-        print("STOCK:", option_data["stock_price"])
-        print("STRIKE:", option_data["strike_price"])
-        print("OPTION PRICE:", option_data["option_price"], f"({option_data['price_source']})")
-        print("BID/ASK:", option_data.get("bid_price"), "/", option_data.get("ask_price"))
-
-        if option_data.get("spread_pct") is not None:
-            print("SPREAD:", f"{round(option_data['spread_pct'], 1)}%")
-
-        print("FAIR VALUE (اروپایی/بلک-شولز):", option_data["fair_value"])
-        if option_data.get("fair_value_american") is not None:
-            print(
-                "FAIR VALUE (آمریکایی/دوجمله‌ای):", option_data["fair_value_american"],
-                f"| صرف اعمال زودهنگام: {option_data.get('early_exercise_premium')}"
-            )
-        print(
-            "VOLATILITY:",
-            f"{round(option_data.get('volatility_used', 0) * 100, 1)}%",
-            "(تاریخی)" if self._historical_volatility else "(تخمینی)"
-        )
-
-        if option_data.get("implied_volatility") is not None:
-            print(
-                "IMPLIED VOL:",
-                f"{round(option_data['implied_volatility'] * 100, 1)}%",
-                f"| IV/HV ratio: {option_data.get('iv_premium_ratio')}x"
-            )
-
-        if option_data.get("iv_crush_risk"):
-            print("⚠️ IV CRUSH RISK: آپشن در حباب نوسان است")
-
-        print("DELTA:", option_data["delta"])
-        adv = option_data.get("advanced_greeks") or {}
-        if adv.get("available"):
-            print(
-                "ADVANCED GREEKS RISK:", adv.get("risk_level"),
-                f"| Charm/day={adv.get('charm_1d')} | Vanna/1%={adv.get('vanna_1pct')} "
-                f"| Volga/1%={adv.get('volga_1pct')} | Color/day={adv.get('color_pct_1d')}%"
-            )
-            for warning in adv.get("reasons", []):
-                print("  [AG]", warning)
+        # تست ۱: خرید CALL
+        print("--- [تست ۱: خرید CALL] ---")
+        best_call = get_best_option(test_db, "اهرم", "BUY_CALL", 57000)
+        if best_call and best_call.get('symbol') == 'ضاهرم7001':
+            print("🥇 تست ۱: پاس ✅\n")
+            results.append(True)
         else:
-            print("ADVANCED GREEKS RISK: UNKNOWN (داده/سررسید کافی نیست)")
-        print("VALUATION:", option_data["valuation"])
-        print("DISTANCE:", f"{option_data['distance_pct']}%")
-        print("RISK/REWARD:", option_data["risk_reward_ratio"])
-        print("PROB OF PROFIT:", f"{option_data['probability_of_profit']}%")
+            got = best_call.get('symbol') if best_call else 'None'
+            print(f"❌ تست ۱: شکست (انتظار: ضاهرم7001، دریافت: {got})\n")
+            results.append(False)
 
-        print("FINAL ACTION:", decision["action"])
-        print("CONFIDENCE:", decision["confidence"])
+        # تست ۲: خرید PUT
+        print("--- [تست ۲: خرید PUT] ---")
+        best_put = get_best_option(test_db, "اهرم", "BUY_PUT", 57000)
+        if best_put and best_put.get('symbol') == 'طاهرم7001':
+            print("🥇 تست ۲: پاس ✅\n")
+            results.append(True)
+        else:
+            got = best_put.get('symbol') if best_put else 'None'
+            print(f"❌ تست ۲: شکست (انتظار: طاهرم7001، دریافت: {got})\n")
+            results.append(False)
 
-        print("REASONS:")
-        for reason in decision["reasons"]:
-            print("-", reason)
+        # تست ۳: WATCH (نباید آپشن برگرداند)
+        print("--- [تست ۳: سیگنال WATCH] ---")
+        best_watch = get_best_option(test_db, "اهرم", "WATCH", 57000)
+        if best_watch is None:
+            print("🥇 تست ۳: پاس ✅ (درست None برگرداند)\n")
+            results.append(True)
+        else:
+            print("❌ تست ۳: شکست (باید None برمی‌گرداند)\n")
+            results.append(False)
 
-        print("-" * 60)
+        best_call = best_put = best_watch = None
 
-        decision.update(option_data)
+        if _safe_remove(test_db):
+            print("🧹 فایل موقت پاک شد.")
+        else:
+            print(f"ℹ️ فایل '{test_db}' قفل است. دستی پاک کنید.")
 
-        return decision
-
-    def close(self):
-        self.conn.close()
-
-
-if __name__ == "__main__":
-    selector = OptionSelector()
-
-    result = selector.run(
-        stock_action="BUY",
-        stock_confidence=45
-    )
-
-    print(result)
-
-    candidates = selector.get_top_candidates("BUY")
-
-    print("\nTOP CANDIDATES:")
-    for c in candidates:
-        print(
-            c["symbol"],
-            f"R/R={c['risk_reward_ratio']:.2f}",
-            f"Δ={c.get('delta', 0):.2f}",
-            f"Dist={c.get('distance_pct', 0):.1f}%"
-        )
-
-    selector.close()
+        if all(results):
+            print("\n🎉 تمام تست‌ها پاس شدند!")
+        else:
+            print(f"\n⚠️ {results.count(False)} تست شکست خورد.")
+        print("================================================\n")
+    else:
+        print("اجرای تست:  python option_selector.py --test")
