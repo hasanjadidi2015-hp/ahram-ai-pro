@@ -18,9 +18,9 @@ OUTPUT_FILE = "dashboard_v5.html"
 OUTPUT_FILE_VIP5 = "options_dashboard_VIP5.html"
 REFRESH_SECONDS = 20
 SYMBOL_DBS = [
-    ("اهرم", "ahram_v2.db"),
-    ("وبملت", "webmellt.db"),
-    ("شستا", "shasta.db"),
+    ("اهرم", "ahram_v2_v5.db"),
+    ("وبملت", "webmellt_v5.db"),
+    ("شستا", "shasta_v5.db"),
 ]
 
 def _connect(db):
