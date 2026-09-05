@@ -778,6 +778,22 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
     return result
 
 
+def _score_in_trade_direction(action, technical_score):
+    """امتیاز تکنیکال برای کال مثبت است (مثلاً +60) و برای پوت منفی (مثلاً -60).
+    فرمول نهایی final = score*0.6 + check*0.4 با آستانه 45 است.
+    اگر score منفی بماند، حتی با همه چک‌ها سبز حداکثر حدود 13 می‌شود و BUY_PUT
+    هیچ‌وقت صادر نمی‌شود. برای پوت قدر مطلقِ جهت معامله را می‌گیریم: -(-60)=60.
+    مسیر کال دست نمی‌خورد.
+    """
+    try:
+        s = float(technical_score)
+    except (TypeError, ValueError):
+        s = 0.0
+    if action in ("SELL", "STRONG SELL"):
+        return -s
+    return s
+
+
 def generate_multi_layer_signal(symbol_config, technicals, options_analysis, market_data):
     name = symbol_config["name"]
     state.log(f"🚦 تولید سیگنال: {name}")
@@ -888,7 +904,13 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     passed_checks = sum(1 for v in checks.values() if v)
     total_checks = len(checks)
     check_score = (passed_checks / total_checks) * 100
-    final_score = (score * 0.6) + (check_score * 0.4)
+    direction_score = _score_in_trade_direction(technicals.get("action"), score)
+    final_score = (direction_score * 0.6) + (check_score * 0.4)
+    if technicals.get("action") in ("SELL", "STRONG SELL"):
+        state.log(
+            f"  امتیاز پوت: تکنیکال {score} -> جهت معامله {round(direction_score, 1)} | "
+            f"نهایی {round(final_score, 1)}"
+        )
 
     ml_reason = None
     if _HAS_ML and option:
