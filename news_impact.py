@@ -43,7 +43,10 @@ def update_news_impact(db_path=None):
     """برای هر خبری که هنوز کامل ارزیابی نشده، چک می‌کنه چند روز کاری از
     تاریخش گذشته و outcome_pct_1d/5d/20d رو (اگه ممکن بود) پر می‌کنه."""
     db_path = db_path or config.DATABASE_NAME
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=5.0)
+    conn.execute("PRAGMA busy_timeout = 5000")  # اگه DB لحظه‌ای قفل بود (مثلاً یه پردازش دیگه داره می‌نویسه)
+    # حداکثر ۵ ثانیه صبر کن، نه بی‌نهایت -- تا یه قفل موقت باعث هنگ کردن کل چرخه نشه
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_prices_time ON prices(time)")
     cur = conn.cursor()
 
     cur.execute(
@@ -51,6 +54,9 @@ def update_news_impact(db_path=None):
         "FROM daily_news WHERE fully_evaluated=0 AND price_at_news IS NOT NULL"
     )
     rows = cur.fetchall()
+    if len(rows) > 200:
+        print(f"⚠️ NEWS-IMPACT WARNING: {len(rows)} خبر هنوز کامل ارزیابی نشده -- "
+              f"این تعداد غیرعادی زیاده و می‌تونه این مرحله رو کند کنه")
 
     updated = 0
     for news_id, news_time, price_at_news, o1, o5, o20 in rows:
