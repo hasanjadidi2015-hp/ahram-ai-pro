@@ -50,7 +50,7 @@ def update_news_impact(db_path=None):
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT id, time, price_at_news, outcome_pct_1d, outcome_pct_5d, outcome_pct_20d "
+        "SELECT id, time, event_date, price_at_news, outcome_pct_1d, outcome_pct_5d, outcome_pct_20d "
         "FROM daily_news WHERE fully_evaluated=0 AND price_at_news IS NOT NULL"
     )
     rows = cur.fetchall()
@@ -59,9 +59,15 @@ def update_news_impact(db_path=None):
               f"این تعداد غیرعادی زیاده و می‌تونه این مرحله رو کند کنه")
 
     updated = 0
-    for news_id, news_time, price_at_news, o1, o5, o20 in rows:
-        news_date = news_time.split(" ")[0]
-        trading_dates = _trading_dates_on_or_after(cur, news_date)
+    for news_id, news_time, event_date, price_at_news, o1, o5, o20 in rows:
+        # قبلاً از news_time (زمان کشف/ثبت خبر توسط کالکتور) استفاده می‌شد که
+        # با event_date (تاریخ واقعی رخداد خبر) فرق داره -- برای خبرهای قدیمی
+        # که دیر کشف/بک‌فیل شدن (مثل خبر 2022 که تازه اخیراً ثبت شده بود)،
+        # این باعث می‌شد شمارش ۲۰ روزه از تاریخ کشف شروع بشه نه از تاریخ واقعی
+        # رخداد -- یعنی هم اندازه‌گیری اثر خبر غلط بود، هم خبر بی‌دلیل تو صف
+        # "ارزیابی‌نشده" می‌موند انگار همین چند روز پیش اتفاق افتاده.
+        ref_date = (event_date or news_time).split(" ")[0]
+        trading_dates = _trading_dates_on_or_after(cur, ref_date)
         if not trading_dates:
             continue
 
@@ -82,11 +88,17 @@ def update_news_impact(db_path=None):
 
         fully_done = False
         if len(trading_dates) >= 21:
-            p20 = _price_on_date(cur, trading_dates[20])
-            if p20:
-                updates["outcome_pct_20d"] = round((p20 - price_at_news) / price_at_news * 100, 2)
-                changed = True
-                fully_done = True
+            # قبلاً فقط trading_dates[20] چک می‌شد -- اگه دقیقاً همون یه روز
+            # قیمت نداشت (گپ داده، تعطیلی غیرمنتظره و...)، خبر برای همیشه
+            # "ارزیابی‌نشده" می‌موند، حتی سال‌ها بعد. الان تا اولین قیمت
+            # معتبر از روز بیستم به بعد جلو می‌ره.
+            for idx in range(20, len(trading_dates)):
+                p20 = _price_on_date(cur, trading_dates[idx])
+                if p20:
+                    updates["outcome_pct_20d"] = round((p20 - price_at_news) / price_at_news * 100, 2)
+                    changed = True
+                    fully_done = True
+                    break
 
         if changed:
             set_clause = ", ".join(f"{k}=?" for k in updates)

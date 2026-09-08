@@ -122,6 +122,7 @@ def print_daily_report(summaries: List[Dict[str, Any]], is_test: bool = False):
         sig = s["last_signal"]
         score = s["last_score"]
         opt_sym = s["option_symbol"]
+        opt_price = s["option_price"]
         sl = s["stop_loss"]
         tp = s["take_profit"]
 
@@ -134,7 +135,8 @@ def print_daily_report(summaries: List[Dict[str, Any]], is_test: bool = False):
 
         print(f"🔹 نماد: {sym} ─── {sig_text}")
         if sig in ["BUY_CALL", "BUY_PUT"] and opt_sym != "-":
-            print(f"   └── آپشن پیشنهادی: {opt_sym} (قیمت ورود: {opt_sym})")
+            opt_price_str = f"{float(opt_price):,.0f} ریال" if opt_price != "-" else "-"
+            print(f"   └── آپشن پیشنهادی: {opt_sym} (قیمت ورود: {opt_price_str})")
             sl_str = f"{float(sl):,.0f} ریال" if sl != "-" else "-"
             tp_str = f"{float(tp):,.0f} ریال" if tp != "-" else "-"
             print(f"   └── حد سود آپشن (TP): {tp_str} | حد ضرر آپشن (SL): {sl_str}")
