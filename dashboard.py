@@ -80,13 +80,12 @@ def get_symbol_data(symbol: str, db_path: str) -> Dict[str, Any]:
             if last_sig:
                 d = dict(last_sig)
                 data["signal_type"] = d.get("signal_type", "WATCH")
-                data["signal_score"] = float(d.get("score", 0.0) or 0.0)
+                data["signal_score"] = float(d.get("composite_score", 0.0) or 0.0)
                 data["signal_time"] = d.get("time", "-")
                 data["option_symbol"] = d.get("option_symbol") or "-"
                 data["option_price"] = d.get("option_price") or "-"
                 data["stop_loss"] = d.get("stop_loss") or "-"
-                data["take_profit"] = d.get("take_profit") or "-"
-                data["qty"] = d.get("qty") or "-"
+                data["take_profit"] = d.get("target1") or "-"
 
             cursor.execute("SELECT * FROM signal_history ORDER BY id DESC LIMIT 5")
             data["recent_signals"] = [dict(r) for r in cursor.fetchall()]
