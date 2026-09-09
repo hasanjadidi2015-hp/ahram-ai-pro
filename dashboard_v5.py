@@ -249,26 +249,72 @@ def _open_positions():
             continue
         cur = conn.cursor()
         _update_pending_outcomes(cur, conn)
-        rows = _safe(
+        # نکته‌ی مهم: نمی‌شه چند تا MIN/MAX مختلف (MIN(id) و MAX(v2_score) و
+        # MAX(v2_best_symbol)) رو تو یه SELECT با ستون‌های خام (option_price,
+        # stop_loss, ...) قاطی کرد -- رفتار SQLite برای اینکه ستون خام از کدوم
+        # ردیف بیاد فقط وقتی یه MIN/MAX تنها تو کوئری باشه مشخصه؛ با چندتا
+        # MIN/MAX، انتخاب ردیف برای ستون‌های خام مبهم می‌شه (همون چیزی که باعث
+        # شد قیمت ورود اشتباه نشون داده بشه). این‌جا با دو زیرکوئری صریح --
+        # یکی برای ردیف اولین ثبت (قیمت ورود واقعی)، یکی برای آخرین وضعیت --
+        # این ابهام کاملاً برطرف می‌شه.
+        entry_rows = _safe(
             cur,
-            "SELECT position_id, symbol, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id), "
-            "MAX(v2_score), MAX(v2_best_symbol) FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL GROUP BY position_id",
+            """
+            SELECT sh.position_id, sh.symbol, sh.option_symbol, sh.option_price,
+                   sh.stop_loss, sh.target1, sh.target2
+            FROM signal_history sh
+            INNER JOIN (
+                SELECT position_id, MIN(id) AS entry_id
+                FROM signal_history
+                WHERE position_id IS NOT NULL
+                GROUP BY position_id
+            ) first_row ON sh.id = first_row.entry_id
+            """,
         )
-        # fallback اگر ستون v2 نباشه
-        if not rows:
-            rows = _safe(
+        entry_by_pos = {r[0]: r for r in (entry_rows or [])}
+
+        latest_rows = _safe(
+            cur,
+            """
+            SELECT sh.position_id, sh.outcome, sh.v2_score, sh.v2_best_symbol
+            FROM signal_history sh
+            INNER JOIN (
+                SELECT position_id, MAX(id) AS latest_id
+                FROM signal_history
+                WHERE position_id IS NOT NULL
+                GROUP BY position_id
+            ) last_row ON sh.id = last_row.latest_id
+            """,
+        )
+        # fallback اگر ستون‌های v2 نباشن
+        if not latest_rows:
+            latest_rows = _safe(
                 cur,
-                "SELECT position_id, symbol, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
-                "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL GROUP BY position_id",
+                """
+                SELECT sh.position_id, sh.outcome, NULL, NULL
+                FROM signal_history sh
+                INNER JOIN (
+                    SELECT position_id, MAX(id) AS latest_id
+                    FROM signal_history
+                    WHERE position_id IS NOT NULL
+                    GROUP BY position_id
+                ) last_row ON sh.id = last_row.latest_id
+                """,
             )
-            # تبدیل به فرمت جدید
-            rows = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], None, None) if len(r)==9 else r for r in rows]
+        latest_by_pos = {r[0]: r for r in (latest_rows or [])}
+
+        rows = []
+        for pos_id, latest in latest_by_pos.items():
+            _, outcome, v2_score, v2_best = latest
+            if outcome not in ("PENDING", "T1_HIT"):
+                continue
+            entry = entry_by_pos.get(pos_id)
+            if not entry:
+                continue
+            _, stock, sym, option_price, sl, t1, t2 = entry
+            rows.append((pos_id, stock, sym, option_price, sl, t1, t2, outcome, v2_score, v2_best))
         for row in rows:
-            if len(row) >= 11:
-                pos_id, stock, sym, entry, sl, t1, t2, outcome, _, v2_score, v2_best = row
-            else:
-                pos_id, stock, sym, entry, sl, t1, t2, outcome, _ = row[:9]
-                v2_score = v2_best = None
+            pos_id, stock, sym, entry, sl, t1, t2, outcome, v2_score, v2_best = row
             current = entry
             price_rows = _safe(cur, "SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (sym,))
             if price_rows and price_rows[0][0]:
