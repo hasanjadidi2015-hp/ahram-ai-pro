@@ -206,6 +206,12 @@ def collect_order_book(db_path=None, ins_code=None):
     else:
         pressure = "BALANCED"
 
+    if market_state == "TWO_SIDED" and spread_pct is None:
+        print(f"⚠️ ORDER-BOOK WARNING: بازار دوطرفه‌ست ولی اسپرد None شد -- "
+              f"یعنی قیمت سطح ۱ (best_buy={best_buy}, best_sell={best_sell}) صفر یا خالیه "
+              f"با اینکه سطح‌های دیگه داده دارن. رو سیگنال اثر نداره (imbalance از مجموع همه سطح‌ها میاد)، "
+              f"ولی خودِ عدد اسپرد نمایشی درست نیست.")
+
     return {
         "time": now,
         "best_buy": best_buy,
