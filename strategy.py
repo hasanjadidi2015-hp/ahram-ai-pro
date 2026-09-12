@@ -313,7 +313,8 @@ class Strategy:
         if self.rsi_div:
             print(f"[RSI-DIV] {self.rsi_div.divergence_type or 'NONE'} | RSI={self.rsi_div.details.get('current_rsi')}")
         if self.ema_obj:
-            print(f"[EMA] {ema_signal} | strength={self.ema_obj.strength}")
+            slope_txt = {True: "تأییدشده", False: "مخالف", None: "نامشخص"}.get(self.ema_obj.slope_ok)
+            print(f"[EMA] {ema_signal} | strength={self.ema_obj.strength} | شیب={slope_txt}")
         if self.macd_obj:
             print(f"[MACD] {macd_signal} | strength={self.macd_obj.strength}")
         if self.adx_obj:
