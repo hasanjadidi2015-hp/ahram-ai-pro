@@ -841,7 +841,7 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
 
     checks = {
         "technicals_ok": False,
-        "volume_ok": True,
+        "volume_ok": False,
         "option_ok": False,
         "wiv_ok": False,
         "fog_ok": False,
@@ -862,10 +862,6 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         reasons.append("✅ تحلیل تکنیکال: نزولی")
     else:
         reasons.append("❌ تحلیل تکنیکال: خنثی")
-
-    if technicals.get("confidence", 0) >= 40:
-        checks["volume_ok"] = True
-        reasons.append("✅ حجم: تأیید")
 
     option = options_analysis.get("selected")
     if option:
@@ -908,8 +904,10 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
             checks["volume_ok"] = True
             reasons.append(f"✅ حجم: صعودی")
         elif vol_final == "SELL":
+            checks["volume_ok"] = False
             reasons.append(f"❌ حجم: نزولی")
         else:
+            checks["volume_ok"] = False
             reasons.append(f"⚠️ حجم: خنثی")
 
     # VACE Filters - فقط V5 Shadow، روی سیگنال قدیمی اثر ندارد تا بک‌تست (فقط لاگ)
