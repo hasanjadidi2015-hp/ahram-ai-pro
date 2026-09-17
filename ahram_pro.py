@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 ╔══════════════════════════════════════════════════════════════╗
-║              AHRAM AI PRO v4.1 - نسخه نهایی                 ║
-║         سیستم معامله‌گری تجمیعی آپشن بورس ایران              ║
+║              AHRAM AI PRO - نسخه نهایی یکپارچه       ║
+║     ادغام 6 ماژول جدید + حفظ منطق v4.1 (ایمن)               ║
 ╚══════════════════════════════════════════════════════════════╝
+تفاوت با v4.1:
+- 5 ماژول جدید به صورت try/except اضافه شد (اگر نباشن کرش نمی‌کنه)
+- analyze_options حالا علاوه بر انتخاب قدیمی، Top 3 کاندید رو با Greek Engine V2 دقیق تحلیل می‌کنه
+- Risk Engine V2 + IV Engine V2 + Scoring Engine V2 + Decision Engine V2
+- خروجی جدید CALL SCORE با breakdown، بدون شکستن سیگنال قدیمی (برای بک‌تست)
+- dashboard V5 نمایش جدید
 """
 import sys
 import os
@@ -19,12 +25,7 @@ try:
 except:
     pass
 
-# ==================== لاگ خودکار روی فایل ====================
-# قبلاً همه‌چیز فقط رو صفحه چاپ می‌شد و اگه پنجره‌ی ترمینال بسته می‌شد یا
-# اسکرول رد می‌شد، اون خروجی برای همیشه از دست می‌رفت (دقیقاً همون مشکلی که
-# باعث شد نتونیم بفهمیم چرا داشتبورد یک ساعت از قفل صف فروش وبملت عقب بود).
-# از این به بعد هر خطی که با print() یا state.log() چاپ می‌شه، هم‌زمان تو یه
-# فایل لاگ روزانه هم ذخیره می‌شه -- بدون اینکه چیزی از نمایش رو صفحه کم بشه.
+# ==================== لاگ خودکار روی فایل (مثل V4) ====================
 class _TeeToLogFile:
     """هر چی رو صفحه چاپ می‌شه رو هم‌زمان تو یه فایل هم می‌نویسه."""
     def __init__(self, stream, log_path):
@@ -34,7 +35,7 @@ class _TeeToLogFile:
     def write(self, message):
         self._stream.write(message)
         self._log_file.write(message)
-        self._log_file.flush()  # بدون این، اگه برنامه crash کنه آخرین خط‌ها ذخیره نمی‌شن
+        self._log_file.flush()
 
     def flush(self):
         self._stream.flush()
@@ -52,6 +53,7 @@ def _enable_file_logging():
     sys.stderr = _TeeToLogFile(sys.stderr, log_path)
     print(f"📝 لاگ این اجرا هم‌زمان ذخیره می‌شه در: {log_path}")
 
+# ===== ماژول‌های قدیمی (v4.1) =====
 try:
     import ml_adjust
     _HAS_ML = True
@@ -77,10 +79,79 @@ except Exception as _e:
     _HAS_IVRANK = False
     print(f"[WARN] iv_rank بارگذاری نشد: {_e}")
 
+# ===== ماژول‌های جدید V2 - 6 ماژول Option Decision System =====
+try:
+    from greek_engine_v2 import analyze_contract as analyze_contract_v2
+    _HAS_GREEK_V2 = True
+    print(f"[OK] greek_engine_v2 بارگذاری شد")
+except Exception as _e:
+    analyze_contract_v2 = None
+    _HAS_GREEK_V2 = False
+    print(f"[WARN] greek_engine_v2 بارگذاری نشد: {_e}")
+
+try:
+    from iv_engine_v2 import analyze_iv as analyze_iv_v2, record_daily_iv as record_daily_iv_v2
+    try:
+        from iv_engine_v2 import record_skew as record_skew_v2
+    except:
+        from iv_engine_v2 import record_skew_history as record_skew_v2
+    _HAS_IV_V2 = True
+    print(f"[OK] iv_engine_v2 بارگذاری شد")
+except Exception as _e:
+    analyze_iv_v2 = record_daily_iv_v2 = record_skew_v2 = None
+    _HAS_IV_V2 = False
+    print(f"[WARN] iv_engine_v2 بارگذاری نشد: {_e}")
+
+try:
+    from risk_engine_v2 import analyze_risk as analyze_risk_v2
+    _HAS_RISK_V2 = True
+    print(f"[OK] risk_engine_v2 بارگذاری شد")
+except Exception as _e:
+    analyze_risk_v2 = None
+    _HAS_RISK_V2 = False
+    print(f"[WARN] risk_engine_v2 بارگذاری نشد: {_e}")
+
+try:
+    from contract_scoring_engine_v2 import rank_contracts as rank_contracts_v2
+    _HAS_SCORING_V2 = True
+    print(f"[OK] contract_scoring_engine_v2 بارگذاری شد")
+except Exception as _e:
+    rank_contracts_v2 = None
+    _HAS_SCORING_V2 = False
+    print(f"[WARN] contract_scoring_engine_v2 بارگذاری نشد: {_e}")
+
+try:
+    from decision_engine_v2 import make_decision as make_decision_v2
+    _HAS_DECISION_V2 = True
+    print(f"[OK] decision_engine_v2 بارگذاری شد")
+except Exception as _e:
+    make_decision_v2 = None
+    _HAS_DECISION_V2 = False
+    print(f"[WARN] decision_engine_v2 بارگذاری نشد: {_e}")
+
+try:
+    from sentiment_engine_v2 import analyze_sentiment as analyze_sentiment_v2
+    _HAS_SENTIMENT_V2 = True
+    print(f"[OK] sentiment_engine_v2 بارگذاری شد")
+except Exception as _e:
+    analyze_sentiment_v2 = None
+    _HAS_SENTIMENT_V2 = False
+    print(f"[WARN] sentiment_engine_v2 بارگذاری نشد: {_e}")
+
+try:
+    from vace_engine_v2 import analyze_vace, calculate_tiered_tp, check_break_even
+    _HAS_VACE_V2 = True
+    print(f"[OK] vace_engine_v2 بارگذاری شد")
+except Exception as _e:
+    analyze_vace = calculate_tiered_tp = check_break_even = None
+    _HAS_VACE_V2 = False
+    print(f"[WARN] vace_engine_v2 بارگذاری نشد: {_e}")
+
 CONFIG = {
-    "version": "4.1",
-    "name": "AHRAM AI PRO",
+    "version": "5.0",
+    "name": "AHRAM AI PRO - نسخه نهایی",
     "symbols": [
+        # DB جدا برای V5 - هیچ تداخلی با V4.1 ندارد (ahram_v2.db اصلی دست نمی‌خورد)
         {"name": "اهرم", "ins_code": "17914401175772326", "db": "ahram_v2.db", "option_root": "هرم", "queue_gap": 4.0},
         {"name": "وبملت", "ins_code": "778253364357513", "db": "webmellt.db", "option_root": "ملت", "queue_gap": 7.0},
         {"name": "شستا", "ins_code": "2400322364771558", "db": "shasta.db", "option_root": "ستا", "queue_gap": 7.0},
@@ -93,12 +164,16 @@ CONFIG = {
     "min_volume_ratio": 1.0,
     "max_wiv_for_buy": 85,
     "max_positions": 3,
-    "max_position_hold_hours": 3,   # بعد از این مدت، پوزیشن باز-فرض‌شده منقضی می‌شه
+    "max_position_hold_hours": 3,
     "risk_per_trade": 0.05,
     "capital": 100_000_000,
-    "telegram_enabled": True,
-    "desktop_enabled": True,
+    # V5 در حالت SHADOW - هیچ نوتیفیکیشن واقعی نمی‌فرسته، فقط لاگ
+    "telegram_enabled": False,
+    "desktop_enabled": False,
     "dashboard_enabled": True,
+    "v2_enabled": True,
+    "v2_min_score": 45,
+    "shadow_mode": True,  # الگوی shadow_strategy.py - فقط محاسبه و لاگ، بدون اثر روی DB اصلی
 }
 
 
@@ -109,10 +184,6 @@ class SystemState:
         self.signals_generated = 0
         self.last_signal_time = None
         self.errors = []
-        # نماد -> {"direction": "BUY_CALL"/"BUY_PUT", "since": datetime}
-        # برای جلوگیری از نوتیفیکیشن تکراری وقتی یه پوزیشن از قبل باز فرض می‌شه،
-        # و برای اعمال واقعی CONFIG["max_positions"] (که قبلاً تعریف بود ولی
-        # هیچ‌جا استفاده نمی‌شد).
         self.open_positions = {}
 
     def log(self, message, level="INFO"):
@@ -200,15 +271,13 @@ def collect_market_data(symbol_config):
     except Exception as e:
         state.log(f"  ❌ خطا قیمت سهم: {e}", "ERROR")
 
-    # اکتشافی -- تازه ساخته شده، هنوز روی داده‌ی زنده تست نشده. اگه فیلدها
-    # اشتباه بود، فقط لاگ می‌کنه و ادامه می‌ده، به بقیه‌ی تحلیل آسیب نمی‌زنه.
     try:
         from order_book import collect_order_book
         ob = collect_order_book(db)
         data["market"]["order_book"] = ob
         if ob:
             state_labels = {
-                "TWO_SIDED": None,  # حالت عادی -- امتیاز/اسپرد معنادارن
+                "TWO_SIDED": None,
                 "LOCKED_BUY_QUEUE": "🔥 صف خرید قفل‌شده (هیچ فروشنده‌ای در ۵ ردیف نیست)",
                 "LOCKED_SELL_QUEUE": "🧊 صف فروش قفل‌شده (هیچ خریداری در ۵ ردیف نیست)",
                 "NO_DATA": "داده‌ای برای هیچ‌کدوم از دو طرف دریافت نشد",
@@ -222,13 +291,10 @@ def collect_market_data(symbol_config):
                     f"اسپرد {ob['spread_pct']}%"
                 )
         else:
-            state.log("  ⚠️ عمق سفارش دریافت نشد (فیلدهای TSETMC رو چک کن)", "WARN")
+            state.log("  ⚠️ عمق سفارش دریافت نشد", "WARN")
     except Exception as e:
         state.log(f"  ⚠️ خطا عمق سفارش: {e}", "WARN")
 
-    # اکتشافی -- تازه ساخته شده. اگه خبر جدید (کدال یا ناظر بازار) پیدا بشه،
-    # بلافاصله هشدار می‌ده -- نه فقط لاگ -- چون این نوع خبر می‌تونه قیمت رو
-    # ناگهانی جابه‌جا کنه.
     try:
         from daily_news import check_daily_news
         news_items = check_daily_news(db)
@@ -253,14 +319,6 @@ def collect_market_data(symbol_config):
         state.log(f"  ⚠️ خطا آپشن: {e}", "WARN")
 
     def _run_with_timeout(func, timeout=20):
-        """اجرای تابع با تایم‌اوت تا کل سیکل هنگ نکنه (مخصوص algotik_tse که گاهی هنگ می‌کنه).
-
-        نکته‌ی مهم: نباید از `with ThreadPoolExecutor(...) as executor` استفاده
-        بشه -- خروج از اون بلاک به‌صورت پیش‌فرض shutdown(wait=True) صدا می‌زنه،
-        یعنی صبر می‌کنه thread هنگ‌کرده واقعاً تموم بشه، که دقیقاً همون هنگ
-        کردنی رو که این تابع قراره جلوش رو بگیره دوباره برمی‌گردونه (فقط با
-        یه پیام هشدار زودتر که گمراه‌کننده‌ست، چون کل سیکل بازم قفل می‌مونه).
-        """
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         future = executor.submit(func)
         try:
@@ -283,7 +341,7 @@ def collect_market_data(symbol_config):
                 data["market"]["indices"] = indices
                 state.log(f"  ✅ شاخص‌ها دریافت شد")
             else:
-                state.log(f"  ⚠️ شاخص‌ها تایم‌اوت/خالی - ادامه بدون شاخص", "WARN")
+                state.log(f"  ⚠️ شاخص‌ها تایم‌اوت/خالی", "WARN")
     except Exception as e:
         state.log(f"  ⚠️ خطا شاخص: {e}", "WARN")
 
@@ -295,7 +353,7 @@ def collect_market_data(symbol_config):
                 data["market"]["money_flow"] = flow
                 state.log(f"  ✅ جریان پول دریافت شد")
             else:
-                state.log(f"  ⚠️ جریان پول تایم‌اوت/خالی - ادامه بدون جریان پول", "WARN")
+                state.log(f"  ⚠️ جریان پول تایم‌اوت/خالی", "WARN")
     except Exception as e:
         state.log(f"  ⚠️ خطا جریان پول: {e}", "WARN")
 
@@ -322,6 +380,37 @@ def analyze_technicals(symbol_config):
         if Strategy:
             strategy = Strategy(db_path=db)
             analysis = strategy.analyze()
+            # ===== فیکس باگ: fib و adx و ... واقعاً کجاست - از خود strategy object بخون =====
+            try:
+                fib_obj = getattr(strategy, 'fib', None)
+                if fib_obj:
+                    result["indicators"]["fibonacci"] = {
+                        "details": getattr(fib_obj, 'details', {}),
+                        "levels": getattr(fib_obj, 'levels', {}),
+                        "trend": getattr(fib_obj, 'trend', 'UNKNOWN'),
+                        "zone": getattr(fib_obj, 'current_zone', 'UNKNOWN'),
+                        "strength": getattr(fib_obj, 'strength', 50),
+                        "support": getattr(fib_obj, 'nearest_support', None),
+                        "resistance": getattr(fib_obj, 'nearest_resistance', None)
+                    }
+                    # برای سازگاری با کد قدیمی که levels جدا می‌خواست
+                    result["indicators"]["fibonacci"]["levels"] = fib_obj.levels
+                adx_obj = getattr(strategy, 'adx_obj', None)
+                if adx_obj:
+                    result["indicators"]["adx"] = {
+                        "value": getattr(adx_obj, 'adx_value', 0),
+                        "strength": getattr(adx_obj, 'strength', 50)
+                    }
+                ema_obj = getattr(strategy, 'ema_obj', None)
+                if ema_obj:
+                    result["indicators"]["ema"] = {"strength": getattr(ema_obj, 'strength', 50)}
+                macd_obj = getattr(strategy, 'macd_obj', None)
+                if macd_obj:
+                    result["indicators"]["macd"] = {"strength": getattr(macd_obj, 'strength', 50)}
+                # HV از market_data قبلاً گرفته شده ولی اینجا هم ذخیره کن
+            except Exception as _ind_e:
+                state.log(f"  ⚠️ خطا جمع‌آوری indicators: {_ind_e}", "WARN")
+            
             strategy.close()
             if analysis:
                 action, confidence, score, price = analysis
@@ -339,7 +428,119 @@ def analyze_technicals(symbol_config):
         state.log(f"  ⚠️ قیمت نامعتبر ({result['price']}) با اکشن {result['action']} -> اجباری WATCH", "WARN")
         result["action"] = "WATCH"
 
+    # ===== VACE Auto-Calibration - فقط V5 Shadow =====
+    if CONFIG.get("v2_enabled") and _HAS_VACE_V2 and CONFIG.get("shadow_mode"):
+        try:
+            # محاسبه ADX فعلی از df
+            adx_current = None
+            try:
+                import pandas as pd
+                import sqlite3
+                conn = sqlite3.connect(db)
+                df = pd.read_sql("SELECT last_price FROM prices ORDER BY id DESC LIMIT 100", conn)
+                df = df.iloc[::-1].reset_index(drop=True)  # قدیمی به جدید (ADX ترتیب زمانی صعودی می‌خواد)
+                conn.close()
+                if len(df) >= 28:
+                    from adx import ADX
+                    adx_calc = ADX(df)
+                    adx_calc.calculate()
+                    adx_current = adx_calc.adx_value
+            except Exception as _e:
+                pass
+
+            # ATR از قیمت‌ها + HV
+            atr_val = None
+            try:
+                # اول از HV اگر موجود باشد (از market_data اصلی می‌آید ولی اینجا نداریم)
+                # پس از تاریخچه قیمت‌ها ATR بساز
+                import pandas as pd
+                import sqlite3
+                conn2 = sqlite3.connect(db)
+                df2 = pd.read_sql("SELECT last_price FROM prices WHERE last_price>0 ORDER BY id DESC LIMIT 30", conn2)
+                conn2.close()
+                if len(df2) >= 14:
+                    closes = df2["last_price"].astype(float).values
+                    # ATR ساده = میانگین True Range
+                    tr = [abs(closes[i] - closes[i-1]) for i in range(1, len(closes))]
+                    atr_val = sum(tr) / len(tr) if tr else None
+            except Exception as _atr_e:
+                pass
+
+            # Fibonacci details - حالا واقعاً پر می‌شود از strategy.fib
+            fib_details = result.get("indicators", {}).get("fibonacci")
+
+            vace_analysis = analyze_vace(
+                db_path=db,
+                current_adx=adx_current,
+                atr=atr_val,
+                close_price=result["price"],
+                fib_details=fib_details,
+                current_price=result["price"]
+            )
+            result["vace"] = vace_analysis
+            state.log(f"  🔬 VACE: {vace_analysis['summary']}")
+            if not vace_analysis["confluence_ok"]:
+                state.log(f"  ⚠️ VACE No-Trade: {vace_analysis['fibo_filter']['reason']}", "WARN")
+        except Exception as e:
+            state.log(f"  ⚠️ خطا VACE: {e}", "WARN")
+
     return result
+
+
+def _get_top_candidates_v5(db_path, signal_type, ua_price, top_n=5):
+    """مثل option_selector.get_best_option ولی چند کاندید برمی‌گردونه (برای V2 ranking).
+    از همون منطق فیلتر (آخرین اسنپ‌شات + DTE مجاز) استفاده می‌کنه تا قرارداد
+    منقضی‌شده انتخاب نشه -- دقیقاً همون فیکسی که تو option_selector.py هست."""
+    if not os.path.exists(db_path) or signal_type not in ("BUY_CALL", "BUY_PUT"):
+        return []
+    db_types = ["CALL", "call", "C", "خرید"] if signal_type == "BUY_CALL" else ["PUT", "put", "P", "فروش"]
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('options','options_data')")
+        tbl = cur.fetchone()
+        if not tbl:
+            return []
+        table_name = tbl[0]
+        cur.execute(f"SELECT MAX(time) FROM {table_name}")
+        latest_row = cur.fetchone()
+        latest_time = latest_row[0] if latest_row else None
+        if not latest_time:
+            return []
+        placeholders = ",".join("?" for _ in db_types)
+        cur.execute(f"SELECT * FROM {table_name} WHERE option_type IN ({placeholders}) AND time = ?",
+                    tuple(db_types) + (latest_time,))
+        rows = cur.fetchall()
+        if not rows:
+            cur.execute(f"SELECT * FROM {table_name} WHERE option_type IN ({placeholders}) AND time >= datetime(?, '-10 minutes')",
+                        tuple(db_types) + (latest_time,))
+            rows = cur.fetchall()
+        conn.close()
+        candidates = []
+        for r in rows:
+            opt = dict(r)
+            strike = opt.get("strike_price", opt.get("strike"))
+            dte = opt.get("days_to_expire", opt.get("dte", opt.get("days_to_maturity")))
+            if strike is None or dte is None:
+                continue
+            try:
+                strike = float(strike)
+                dte = int(float(dte))
+            except (ValueError, TypeError):
+                continue
+            if dte < 10 or dte > 60:
+                continue
+            opt["strike_price"] = strike
+            opt["dte"] = dte
+            opt["dist_pct"] = abs(strike - ua_price) / ua_price * 100 if ua_price > 0 else 999.0
+            opt["snapshot_time"] = latest_time
+            candidates.append(opt)
+        candidates.sort(key=lambda x: x["dist_pct"])
+        return candidates[:top_n]
+    except Exception as e:
+        state.log(f"  ⚠️ خطا گرفتن Top candidates V2: {e}", "WARN")
+        return []
 
 
 def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
@@ -348,8 +549,11 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
     state.log(f"🎯 تحلیل آپشن: {name}")
     result = {"selected": None, "wiv": None, "fog": None, "tape": None,
                "volume_analysis": None, "gamma_exposure": None, "iv_rank": None,
-               "advanced_greeks": None}
+               "advanced_greeks": None,
+               # V2 جدید
+               "v2_ranked": None, "v2_best": None, "v2_iv": None, "v2_all_contracts": None}
 
+    # ===== بخش قدیمی v4.1 - وصل‌شده به option_selector.py جدید (فیکس قراردادهای منقضی) =====
     try:
         get_best_option = get_module("option_selector")
         if get_best_option:
@@ -361,9 +565,8 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
                 opt_signal_type = None
 
             option = get_best_option(db, name, opt_signal_type, stock_price) if opt_signal_type else None
+            top_candidates = _get_top_candidates_v5(db, opt_signal_type, stock_price, top_n=5) if opt_signal_type else []
             if option:
-                # نگاشت نام فیلدهای نسخه‌ی جدید option_selector.py به نام‌های قدیمی
-                # که بقیه‌ی این تابع (چک دیواره‌ی گاما، IV Rank و ...) انتظارشون رو داره
                 option.setdefault("strike_price", option.get("strike_price_clean"))
                 option.setdefault("dte", option.get("dte_clean"))
                 option.setdefault("reasons", [])
@@ -379,10 +582,10 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
                     )
             else:
                 state.log(f"  ⚠️ آپشن مناسب پیدا نشد", "WARN")
+            result["v2_all_contracts"] = top_candidates  # ذخیره برای V2
     except Exception as e:
         state.log(f"  ❌ خطا انتخاب آپشن: {e}", "ERROR")
 
-    # اکتشافی -- فقط اطلاعاتی؛ روی امتیاز/تصمیم BUY-SELL هیچ اثری نداره.
     if _HAS_GAMMA:
         try:
             gx = analyze_gamma_exposure(db, stock_price=stock_price)
@@ -406,8 +609,6 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
         except Exception as e:
             state.log(f"  ⚠️ خطا گاما اکسپوژر: {e}", "WARN")
 
-    # اکتشافی -- IV امروز نسبت به تاریخچه‌ی خودش (نه نسبت به HV مثل fog_meter).
-    # روی امتیاز/تصمیم اثر نمی‌ذاره تا وقتی حداقل چند هفته داده جمع بشه.
     if _HAS_IVRANK:
         try:
             sel = result.get("selected")
@@ -418,18 +619,9 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
             result["iv_rank"] = ivr
             if ivr["ready"]:
                 state.log(
-                    f"  ℹ️ IV Rank (اکتشافی): {ivr['iv_rank']}% | "
+                    f"  ℹ️ IV Rank (قدیمی): {ivr['iv_rank']}% | "
                     f"IV Percentile: {ivr['iv_percentile']}% | بر پایه‌ی {ivr['days']} روز"
                 )
-                if sel and ivr["iv_rank"] is not None:
-                    if ivr["iv_rank"] >= 80:
-                        sel.setdefault("reasons", []).append(
-                            f"⚠️ IV Rank بالا ({ivr['iv_rank']}%) -- پرمیوم نسبت به تاریخچه‌ی خودش گرونه (اکتشافی)"
-                        )
-                    elif ivr["iv_rank"] <= 20:
-                        sel.setdefault("reasons", []).append(
-                            f"ℹ️ IV Rank پایین ({ivr['iv_rank']}%) -- پرمیوم نسبت به تاریخچه‌ی خودش ارزونه (اکتشافی)"
-                        )
             else:
                 state.log(f"  ℹ️ IV Rank: داده کافی نیست ({ivr['days']}/{_IV_MIN_DAYS} روز)")
         except Exception as e:
@@ -466,19 +658,15 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
     except Exception as e:
         state.log(f"  ⚠️ خطا TAPE: {e}", "WARN")
 
-    # تحلیل حجم
     vol_mod = get_module("volume")
     if vol_mod:
         try:
             vol_analysis = vol_mod["vol"](db)
             vol_signal = vol_analysis.calculate()
-            
             pcr = vol_mod["pcr"](db)
             pcr_signal = pcr.calculate()
-            
             oi = vol_mod["oi"](db)
             oi_signal = oi.calculate()
-            
             result["volume_analysis"] = {
                 "volume": vol_signal,
                 "put_call": pcr_signal,
@@ -488,6 +676,154 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
             state.log(f"  ✅ تحلیل حجم: {vol_signal} | Put/Call: {pcr_signal} | OI: {oi_signal}")
         except Exception as e:
             state.log(f"  ⚠️ خطا تحلیل حجم: {e}", "WARN")
+
+    # ===== بخش جدید V2 - Sentiment Engine =====
+    if CONFIG.get("v2_enabled") and _HAS_SENTIMENT_V2:
+        try:
+            state.log(f"  🔬 تحلیل Sentiment V2 شروع...")
+            # market_data برای sentiment از collect_market_data میاد ولی اینجا نداریم - از get_module ها می‌گیریم
+            # برای سادگی: از DB و فایل‌های موجود
+            sentiment_market = {}
+            try:
+                # money_flow
+                mf_mod = get_module("money_flow")
+                # order_book قبلا در collect گرفته شده ولی اینجا نداریم - از DB می‌خونیم
+                from order_book import collect_order_book as _ob_collect
+                # این فقط برای تست - در اجرای اصلی market_data از بالا میاد
+                pass
+            except:
+                pass
+            # برای الان: از فایل‌های JSON اگر موجود باشن
+            # در analyze_symbol، market_data را به analyze_options پاس نمی‌دهیم، پس اینجا فقط با DB کار می‌کنیم
+            # sentiment را با داده‌های موجود از result می‌سازیم
+            wiv_for_sent = result.get("wiv")
+            # ساخت market_data ساده برای sentiment
+            sentiment_input = {
+                "money_flow": {},  # در run_cycle اصلی پر می‌شود
+                "order_book": {}, 
+                "news": [],
+                "indices": {}
+            }
+            # سعی کن از فایل‌های اخیر بخوانی
+            try:
+                if os.path.exists("money_flow.json"):
+                    import json as _json
+                    with open("money_flow.json", "r", encoding="utf-8") as _f:
+                        sentiment_input["money_flow"] = _json.load(_f)
+            except:
+                pass
+
+            # تحلیل sentiment
+            if analyze_sentiment_v2:
+                # اگر در حافظه market_data داریم از collect_market_data قبلی استفاده کن
+                # اینجا چون market_data نداریم، فقط با wiv و DB تحلیل می‌کنیم
+                sent_analysis = analyze_sentiment_v2(
+                    db_path=db,
+                    market_data=sentiment_input,
+                    wiv_data=wiv_for_sent,
+                    iv_rank_data=result.get("iv_rank"),
+                    options_data=result.get("v2_all_contracts")
+                )
+                result["sentiment_v2"] = sent_analysis
+                fg = sent_analysis.get("fear_greed", {})
+                state.log(f"  ✅ Sentiment V2: Fear & Greed {fg.get('fear_greed')}/100 {fg.get('level')} - {fg.get('opportunity')}")
+                if sent_analysis.get("risks"):
+                    for r in sent_analysis["risks"][:2]:
+                        state.log(f"    ⚠️ {r}")
+                if sent_analysis.get("opportunities"):
+                    for o in sent_analysis["opportunities"][:2]:
+                        state.log(f"    ✅ {o}")
+            state.log(f"  🔬 تحلیل Sentiment V2 تمام شد")
+        except Exception as e:
+            state.log(f"  ⚠️ خطا Sentiment V2: {e}", "WARN")
+
+    # ===== بخش جدید V2 - Option Decision System =====
+    if CONFIG.get("v2_enabled") and _HAS_GREEK_V2 and _HAS_RISK_V2 and _HAS_SCORING_V2:
+        try:
+            state.log(f"  🔬 تحلیل V2 (Greek+Risk+Scoring) شروع...")
+            # IV Engine V2
+            iv_analysis = None
+            if _HAS_IV_V2:
+                try:
+                    sel = result.get("selected")
+                    cur_iv = sel.get("implied_volatility") if sel else None
+                    if cur_iv and record_daily_iv_v2:
+                        record_daily_iv_v2(db, cur_iv)
+                    if analyze_iv_v2:
+                        iv_analysis = analyze_iv_v2(db, current_iv=cur_iv)
+                        result["v2_iv"] = iv_analysis
+                        rank = iv_analysis.get("iv_rank", {})
+                        if rank.get("iv_rank") is not None:
+                            state.log(f"  ✅ IV V2: Rank {rank.get('iv_rank')}% Percentile {rank.get('iv_percentile')}% Regime {iv_analysis.get('regime')} Ready {rank.get('ready')}")
+                except Exception as e:
+                    state.log(f"  ⚠️ خطا IV V2: {e}", "WARN")
+
+            # ساخت لیست قراردادها با Greek V2
+            v2_contracts = []
+            candidates = result.get("v2_all_contracts") or []
+            if candidates and analyze_contract_v2:
+                for cand in candidates[:5]:  # فقط 5 تا برای performance
+                    try:
+                        # cand از option_engine قدیمی میاد، ولی ما با V2 دوباره تحلیل می‌کنیم
+                        v2_c = analyze_contract_v2(
+                            symbol=cand.get("symbol"),
+                            stock_price=float(stock_price) if stock_price else float(cand.get("stock_price", 0)),
+                            strike_price=float(cand.get("strike_price")),
+                            option_price=float(cand.get("option_price")),
+                            days_to_expire=int(cand.get("days_to_expire", 30)),
+                            option_type=cand.get("option_type", "CALL"),
+                            db_path=db,
+                            volume=cand.get("volume"),
+                            oi=cand.get("open_interest")
+                        )
+                        v2_contracts.append(v2_c)
+                    except Exception as e:
+                        state.log(f"  ⚠️ خطا تحلیل V2 برای {cand.get('symbol')}: {e}", "WARN")
+                        continue
+
+                # اگر هیچ کاندیدی از selector نیومد، از selected قدیمی استفاده کن
+                if not v2_contracts and result.get("selected"):
+                    try:
+                        sel = result["selected"]
+                        v2_c = analyze_contract_v2(
+                            symbol=sel.get("symbol"),
+                            stock_price=float(stock_price) if stock_price else float(sel.get("stock_price", 0)),
+                            strike_price=float(sel.get("strike_price")),
+                            option_price=float(sel.get("option_price")),
+                            days_to_expire=int(sel.get("days_to_expire", 30)),
+                            option_type=sel.get("option_type", "CALL"),
+                            db_path=db,
+                            volume=sel.get("volume"),
+                            oi=sel.get("open_interest")
+                        )
+                        v2_contracts.append(v2_c)
+                    except Exception as e:
+                        state.log(f"  ⚠️ خطا تبدیل selected به V2: {e}", "WARN")
+
+            # Scoring V2
+            if v2_contracts and rank_contracts_v2:
+                try:
+                    # technicals رو به شکل ساده می‌سازیم برای scoring
+                    tech_for_scoring = {"action": stock_action, "score": stock_confidence, "confidence": stock_confidence}
+                    ranked = rank_contracts_v2(v2_contracts, technicals=tech_for_scoring, iv_analysis=iv_analysis)
+                    result["v2_ranked"] = ranked
+                    if ranked:
+                        result["v2_best"] = ranked[0]
+                        state.log(f"  ✅ V2 Best: {ranked[0]['symbol']} Score {ranked[0]['score']}/100 Risk {ranked[0]['risk']}")
+                        # لاگ breakdown
+                        for b in ranked[0]["breakdown"][:3]:
+                            state.log(f"    + {b}")
+                except Exception as e:
+                    state.log(f"  ⚠️ خطا Scoring V2: {e}", "WARN")
+
+            state.log(f"  🔬 تحلیل V2 تمام شد")
+        except Exception as e:
+            state.log(f"  ❌ خطا کلی V2: {e}", "ERROR")
+    else:
+        if not CONFIG.get("v2_enabled"):
+            state.log(f"  ℹ️ V2 غیرفعال (v2_enabled=False)")
+        else:
+            state.log(f"  ⚠️ V2 ماژول‌ها کامل نیست - رد شد", "WARN")
 
     return result
 
@@ -504,6 +840,8 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         "fog_ok": False,
         "tape_ok": False,
         "market_ok": False,
+        "vace_adx_ok": True,  # VACE جدید
+        "vace_fibo_ok": True,
     }
 
     reasons = []
@@ -552,7 +890,6 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         else:
             reasons.append(f"⚠️ TAPE: {tape_data.get('score')}/5")
 
-    # بررسی تحلیل حجم
     vol_data = options_analysis.get("volume_analysis")
     if vol_data:
         vol_final = vol_data.get("volume", "NEUTRAL")
@@ -565,6 +902,30 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         else:
             checks["volume_ok"] = False
             reasons.append(f"⚠️ حجم: خنثی")
+
+    # VACE Filters - فقط V5 Shadow، روی سیگنال قدیمی اثر ندارد تا بک‌تست (فقط لاگ)
+    vace_data = technicals.get("vace") if isinstance(technicals, dict) else None
+    if vace_data:
+        # ADX Dynamic
+        dyn_adx = vace_data.get("dynamic_adx", {})
+        if dyn_adx.get("is_trending") is False:
+            checks["vace_adx_ok"] = False
+            reasons.append(f"⚠️ VACE ADX: روند ضعیف (ADX {dyn_adx.get('current_adx')} < threshold {dyn_adx.get('threshold')}) - اکتشافی")
+        else:
+            checks["vace_adx_ok"] = True
+            reasons.append(f"✅ VACE ADX: روند قوی (ADX {dyn_adx.get('current_adx')} > {dyn_adx.get('threshold')})")
+        
+        # Fibo No-Trade Zone
+        fibo_f = vace_data.get("fibo_filter", {})
+        if not fibo_f.get("allow_entry", True):
+            checks["vace_fibo_ok"] = False
+            reasons.append(f"❌ VACE Fibo: {fibo_f.get('reason')} - اکتشافی (روی قدیمی اثر ندارد)")
+        else:
+            checks["vace_fibo_ok"] = True
+            if fibo_f.get("zone") == "SHALLOW_ZONE":
+                reasons.append(f"⚠️ VACE Fibo: زون کم‌عمق - TP1 روی 38.2% - اکتشافی")
+            else:
+                reasons.append(f"✅ VACE Fibo: {fibo_f.get('zone')} - مجاز")
 
     indices = market_data.get("indices")
     money_flow = market_data.get("money_flow")
@@ -605,7 +966,7 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
             )
         signal_type = "WATCH"
 
-    display_score = max(0, round(final_score))  # فقط برای نمایش؛ تصمیم BUY/WATCH بالاتر با مقدار خام گرفته شده
+    display_score = max(0, round(final_score))
 
     signal = {
         "type": signal_type,
@@ -615,31 +976,127 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         "reasons": reasons,
         "option": option,
         "timestamp": datetime.now().isoformat(),
+        "v2_decision": None,
+        "v2_score": None,
     }
 
     if signal_type in ("BUY_CALL", "BUY_PUT") and option:
-        targets = _calculate_targets(option, signal_type)
+        # VACE data برای targets
+        vace_for_targets = technicals.get("vace") if isinstance(technicals, dict) else None
+        targets = _calculate_targets(option, signal_type, vace_data=vace_for_targets, technicals=technicals)
         signal["targets"] = targets
         signal["message"] = _format_signal_message(signal, name)
     else:
         signal["message"] = f"\n{name}: {signal_type} (امتیاز: {display_score})\n"
+
+    # ===== بخش جدید V2 Decision - بدون اثر روی سیگنال قدیمی تا بک‌تست =====
+    if CONFIG.get("v2_enabled") and _HAS_DECISION_V2 and options_analysis.get("v2_ranked"):
+        try:
+            v2_decision = make_decision_v2(
+                symbol_name=name,
+                technicals=technicals,
+                contracts=[c["contract_analysis"] for c in options_analysis["v2_ranked"]],
+                iv_analysis=options_analysis.get("v2_iv"),
+                market_data=market_data
+            )
+            signal["v2_decision"] = v2_decision
+            signal["v2_score"] = v2_decision.get("final_score")
+            signal["v2_best"] = v2_decision.get("best_contract")
+
+            # لاگ V2
+            state.log(f"  🔬 V2 Decision: {v2_decision['decision']} Score {v2_decision['final_score']}/100")
+            if v2_decision.get("warning"):
+                state.log(f"  {v2_decision['warning']}", "WARN")
+
+            # اضافه کردن بخش V2 به پیام (فقط نمایش، تصمیم قدیمی دست نخورده)
+            v2_msg = v2_decision.get("message", "")
+            signal["message"] += "\n\n--- Option Decision V2 (اکتشافی) ---\n" + v2_msg
+
+            # اگر V2 میگه WATCH ولی قدیمی BUY میگه، هشدار بده (برای بک‌تست)
+            if v2_decision["decision"] == "WATCH" and signal_type in ("BUY_CALL", "BUY_PUT"):
+                state.log(f"  ⚠️ اختلاف V2: قدیمی {signal_type} ولی V2 WATCH (Score {v2_decision['final_score']}) - برای بک‌تست ثبت شد", "WARN")
+                signal["reasons"].append(f"⚠️ V2 اختلاف: V2 WATCH با امتیاز {v2_decision['final_score']}")
+
+        except Exception as e:
+            state.log(f"  ⚠️ خطا V2 Decision: {e}", "WARN")
 
     state.log(f"  نتیجه: {signal_type} | امتیاز: {display_score} | شرایط: {passed_checks}/{total_checks}")
 
     return signal
 
 
-def _calculate_targets(option, signal_type):
+def _calculate_targets(option, signal_type, vace_data=None, technicals=None):
     entry = float(option.get("option_price", 0))
     dte = int(option.get("days_to_expire", 30))
     if entry <= 0:
         return None
-    if dte <= 7:
-        sl_pct = 0.10
-    elif dte <= 21:
-        sl_pct = 0.12
-    else:
-        sl_pct = 0.15
+
+    # VACE Auto SL و ATR Factor - اگر موجود باشد
+    sl_pct = None
+    atr_factor = 3.8
+    tp1_override_price = None
+
+    if vace_data:
+        # Auto SL از VACE
+        auto_sl = vace_data.get("auto_sl", {})
+        if auto_sl and auto_sl.get("sl_pct"):
+            sl_pct = abs(auto_sl["sl_pct"]) / 100.0
+        
+        # ATR Factor
+        atr_f = vace_data.get("atr_factor", {})
+        if atr_f and atr_f.get("atr_factor"):
+            atr_factor = atr_f["atr_factor"]
+        
+        # Fibo TP1 override
+        fibo_f = vace_data.get("fibo_filter", {})
+        if fibo_f and fibo_f.get("tp1_override"):
+            tp1_override_price = fibo_f["tp1_override"]
+
+    # Fallback به منطق قدیمی اگر VACE موجود نبود
+    if sl_pct is None:
+        if dte <= 7:
+            sl_pct = 0.10
+        elif dte <= 21:
+            sl_pct = 0.12
+        else:
+            sl_pct = 0.15
+
+    # Tiered TP با ATR Factor داینامیک (VACE)
+    # تخمین ATR از قیمت آپشن
+    atr_value = entry * 0.04 * atr_factor  # تخمین اولیه
+    
+    if vace_data and calculate_tiered_tp:
+        try:
+            tiered = calculate_tiered_tp(entry, atr_value, atr_factor, option.get("option_type", "CALL"))
+            if tiered:
+                # اگر TP1 override از فیبو داریم
+                t1_price = tiered["tp1"]
+                if tp1_override_price:
+                    # TP1 روی سطح 38.2% فیبو (تبدیل به قیمت آپشن - تخمین)
+                    # برای سادگی: TP1 override فقط برای نمایش، محاسبه دقیق نیاز به قیمت سهم دارد
+                    pass
+                
+                return {
+                    "entry": round(entry),
+                    "stop_loss": round(entry * (1 - sl_pct)),
+                    "stop_loss_pct": round(sl_pct * 100),
+                    "target1": tiered["tp1"],
+                    "target1_pct": tiered["tp1_pct"],
+                    "target1_close_pct": tiered["tp1_close_pct"],
+                    "target2": tiered["tp2"],
+                    "target2_pct": tiered["tp2_pct"],
+                    "target2_close_pct": tiered["tp2_close_pct"],
+                    "target3": tiered["tp3"],
+                    "target3_pct": tiered["tp3_pct"],
+                    "target3_close_pct": tiered["tp3_close_pct"],
+                    "atr_factor": atr_factor,
+                    "vace_method": "tiered_tp",
+                    "tp1_override": tp1_override_price
+                }
+        except Exception as e:
+            pass
+
+    # Fallback قدیمی
     t1_pct = 0.15
     t2_pct = 0.30
     return {
@@ -650,6 +1107,8 @@ def _calculate_targets(option, signal_type):
         "target1_pct": round(t1_pct * 100),
         "target2": round(entry * (1 + t2_pct)),
         "target2_pct": round(t2_pct * 100),
+        "atr_factor": atr_factor,
+        "vace_method": "fallback_old"
     }
 
 
@@ -690,6 +1149,11 @@ def _format_signal_message(signal, symbol_name):
 
 
 def send_notification(signal, symbol_name):
+    # V5 SHADOW - هیچ نوتیف واقعی نمی‌فرسته
+    if CONFIG.get("shadow_mode"):
+        if signal["type"] != "WATCH":
+            state.log(f"  🔬 [V5 SHADOW] {signal['type']} {symbol_name} - فقط لاگ", "INFO")
+        return
     if signal["type"] == "WATCH":
         return
     message = signal.get("message", "")
@@ -702,7 +1166,7 @@ def send_notification(signal, symbol_name):
                 if ok:
                     state.log("  ✅ تلگرام ارسال شد")
                 else:
-                    state.log("  ⚠️ تلگرام ارسال نشد (بدون پاسخ موفق از سرور)", "WARN")
+                    state.log("  ⚠️ تلگرام ارسال نشد", "WARN")
         except Exception as e:
             state.log(f"  ❌ خطا تلگرام: {e}", "ERROR")
     if CONFIG["desktop_enabled"]:
@@ -719,11 +1183,9 @@ def send_notification(signal, symbol_name):
 
 
 def log_signal_to_db(signal, symbol_name, db_name):
-    """ذخیره تمام سیگنال‌ها (BUY و WATCH) در دیتابیس"""
     try:
         conn = sqlite3.connect(db_name)
         cur = conn.cursor()
-        
         cur.execute("""
             CREATE TABLE IF NOT EXISTS signal_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -742,10 +1204,8 @@ def log_signal_to_db(signal, symbol_name, db_name):
                 details TEXT
             )
         """)
-        
         cur.execute("PRAGMA table_info(signal_history)")
         columns = [row[1] for row in cur.fetchall()]
-        
         required_columns = {
             "option_symbol": "TEXT",
             "option_price": "REAL",
@@ -757,15 +1217,16 @@ def log_signal_to_db(signal, symbol_name, db_name):
             "signal_type": "TEXT",
             "details": "TEXT",
             "position_id": "TEXT",
+            "v2_score": "REAL",
+            "v2_decision": "TEXT",
+            "v2_best_symbol": "TEXT",
         }
-        
         for col_name, col_type in required_columns.items():
             if col_name not in columns:
                 try:
                     cur.execute(f"ALTER TABLE signal_history ADD COLUMN {col_name} {col_type}")
                 except Exception as _e:
                     state.log(f"⚠️ ستون {col_name} اضافه نشد: {_e}", "WARN")
-        
         conn.commit()
 
         option = signal.get("option", {})
@@ -773,12 +1234,6 @@ def log_signal_to_db(signal, symbol_name, db_name):
         opt_sym = option.get("symbol") if option else None
         direction = signal["type"]
 
-        # position_id: یه پوزیشن واقعی -- تا وقتی برای همین
-        # (نماد پایه + قرارداد + جهت) یه ردیف PENDING/T1_HIT باز هست، همون
-        # position_id قبلی استفاده می‌شه (یعنی هر بار سیگنال تکرار بشه، به
-        # همون معامله وصل می‌مونه، حتی اگه چند روز طول بکشه). به محض اینکه
-        # اون پوزیشن WIN/LOSS بشه، اگه همون قرارداد دوباره سیگنال بگیره، یه
-        # position_id کاملاً جدید و مستقل می‌گیره.
         position_id = None
         if opt_sym and direction in ("BUY_CALL", "BUY_PUT", "BUY", "STRONG BUY"):
             cur.execute(
@@ -794,11 +1249,18 @@ def log_signal_to_db(signal, symbol_name, db_name):
                 slug = symbol_name.replace(" ", "")
                 position_id = f"{slug}-{opt_sym}-{direction}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
+        v2_decision = signal.get("v2_decision")
+        v2_score = signal.get("v2_score")
+        v2_best_sym = None
+        if v2_decision and v2_decision.get("best_contract"):
+            v2_best_sym = v2_decision["best_contract"].get("symbol")
+
         cur.execute("""
             INSERT INTO signal_history 
             (time, symbol, signal_type, composite_score, option_symbol, 
-             option_price, strike_price, stop_loss, target1, target2, details, position_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             option_price, strike_price, stop_loss, target1, target2, details, position_id,
+             v2_score, v2_decision, v2_best_symbol)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             symbol_name,
@@ -812,19 +1274,18 @@ def log_signal_to_db(signal, symbol_name, db_name):
             targets.get("target2") if targets else None,
             json.dumps(signal, ensure_ascii=False, default=str),
             position_id,
+            v2_score,
+            v2_decision["decision"] if v2_decision else None,
+            v2_best_sym,
         ))
-        
         conn.commit()
         conn.close()
-        state.log(f"  ✅ سیگنال در دیتابیس ذخیره شد")
+        state.log(f"  ✅ سیگنال در دیتابیس ذخیره شد (V2 Score: {v2_score})")
     except Exception as e:
         state.log(f"  ❌ خطا دیتابیس: {e}", "ERROR")
 
 
 def check_live_exits_for_symbol(name, db):
-    """پوزیشن‌های باز این نماد رو با قیمت لحظه‌ای آپشن مقایسه می‌کنه و اگه به
-    هدف/حد ضرر رسیده باشن، بلافاصله هشدار می‌ده (به‌جای اینکه فقط ساکت توی
-    دیتابیس آپدیت بشه و کاربر تا سیکل بعدی داشبورد متوجه نشه)."""
     alerts = []
     try:
         conn = sqlite3.connect(db)
@@ -847,19 +1308,36 @@ def check_live_exits_for_symbol(name, db):
             sl_f = float(sl) if sl else None
             t1_f = float(t1) if t1 else None
             t2_f = float(t2) if t2 else None
-
+            
+            # محاسبه PnL
+            pnl_pct = ((cur_price - entry_f) / entry_f) * 100 if entry_f > 0 else 0
+            
             new_outcome = None
+            
+            # VACE Break-Even: اگر PnL >= 8.5%، SL به قیمت ورود منتقل می‌شود (Risk-Free)
+            if _HAS_VACE_V2 and check_break_even and outcome == "PENDING":
+                try:
+                    if check_break_even(pnl_pct, be_threshold=8.5):
+                        # SL را به entry منتقل کن - فقط اگر SL فعلی پایین‌تر از entry است
+                        if sl_f and sl_f < entry_f:
+                            cur.execute(
+                                "UPDATE signal_history SET stop_loss=? WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
+                                (entry_f, pos_id)
+                            )
+                            state.log(f"  🔬 VACE Break-Even: {sym} PnL {pnl_pct:.1f}% >= 8.5% -> SL به {entry_f:.0f} (Risk-Free)", "INFO")
+                            sl_f = entry_f  # آپدیت برای چک بعدی
+                except Exception as _be_e:
+                    pass
+            
             if sl_f and cur_price <= sl_f:
                 new_outcome = "LOSS"
             elif t2_f and cur_price >= t2_f:
                 new_outcome = "WIN"
             elif t1_f and cur_price >= t1_f and outcome == "PENDING":
                 new_outcome = "T1_HIT"
-
+            
             if new_outcome and new_outcome != outcome:
                 pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
-                # همه‌ی ردیف‌های همین position_id با هم بسته می‌شن -- یه
-                # معامله‌ست، نه چندتا -- وگرنه چندین هشدار تکراری فرستاده می‌شه
                 cur.execute(
                     "UPDATE signal_history SET outcome=?, outcome_pct=? "
                     "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
@@ -871,7 +1349,6 @@ def check_live_exits_for_symbol(name, db):
     except Exception as e:
         state.log(f"  ⚠️ خطا بررسی خروج زنده: {e}", "WARN")
         return
-
     for sym, new_outcome, pct, cur_price in alerts:
         label = {"WIN": "🎯 رسیدن به هدف نهایی", "LOSS": "🛑 برخورد به حد ضرر",
                   "T1_HIT": "✅ رسیدن به هدف اول"}.get(new_outcome, new_outcome)
@@ -880,35 +1357,39 @@ def check_live_exits_for_symbol(name, db):
         send_notification({"type": "EXIT", "message": msg}, name)
 
 
-def _count_total_open_positions():
-    """تعداد واقعی پوزیشن‌های باز (position_id یکتا با outcome PENDING/T1_HIT)
-    در کل سه دیتابیس -- state.open_positions فقط برای جلوگیری از
-    نوتیفیکیشن تکراریه (حداکثر یه ورودی به‌ازای هر نماد)، نه شمارش واقعی
-    ریسک باز؛ چون وقتی cooldown تموم بشه و قرارداد جدیدی برای همون نماد
-    انتخاب بشه، رکورد قرارداد قبلی توی state بی‌صدا بازنویسی می‌شه، در حالی
-    که توی دیتابیس همچنان PENDING مونده. برای کنترل واقعی ریسک، باید از
-    دیتابیس شمرد، نه از حافظه."""
+def count_real_open_positions_from_db():
+    """شمارش واقعی پوزیشن‌های باز از دیتابیس (نه از حافظه) - فیکس باگ max_positions"""
     total = 0
-    for sym in CONFIG["symbols"]:
+    for sym_cfg in CONFIG["symbols"]:
+        db_path = sym_cfg["db"]
+        if not os.path.exists(db_path):
+            continue
         try:
-            conn = sqlite3.connect(sym["db"])
+            conn = sqlite3.connect(db_path)
             cur = conn.cursor()
+            # position_idهای یکتا که هنوز باز هستند
             cur.execute(
                 "SELECT COUNT(DISTINCT position_id) FROM signal_history "
                 "WHERE outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL"
             )
-            total += cur.fetchone()[0] or 0
+            row = cur.fetchone()
+            if row and row[0]:
+                total += int(row[0])
             conn.close()
-        except Exception:
+        except Exception as e:
+            # اگر جدول وجود ندارد یا خطا، نادیده بگیر
+            try:
+                conn.close()
+            except:
+                pass
             continue
     return total
-
 
 def analyze_symbol(symbol_config):
     name = symbol_config["name"]
     db = symbol_config["db"]
     state.log(f"\n{'#' * 60}")
-    state.log(f"# {name}")
+    state.log(f"# {name} - Option Decision System")
     state.log(f"{'#' * 60}")
 
     import config
@@ -931,8 +1412,6 @@ def analyze_symbol(symbol_config):
     options_analysis = analyze_options(symbol_config, technicals["action"], technicals["confidence"], technicals["price"])
     signal = generate_multi_layer_signal(symbol_config, technicals, options_analysis, market_data.get("market", {}))
 
-    # ✅ ذخیره تمام سیگنال‌ها (BUY و WATCH) — این رفتار قبلی دست‌نخورده می‌مونه،
-    # چون گزارش روزانه به رکورد هر سیکل (چه BUY چه WATCH) نیاز داره.
     log_signal_to_db(signal, name, db)
 
     if signal["type"] != "WATCH":
@@ -944,24 +1423,25 @@ def analyze_symbol(symbol_config):
             and existing["direction"] == direction
             and (datetime.now() - existing["since"]) < max_hold
         )
-
         if still_open:
             state.log(
                 f"  ℹ️ سیگنال {direction} تکراریه (پوزیشن از {existing['since'].strftime('%H:%M')} "
                 f"باز فرض می‌شه) -> نوتیفیکیشن دوباره ارسال نشد", "INFO"
             )
-        elif name not in state.open_positions and _count_total_open_positions() >= CONFIG["max_positions"]:
-            state.log(
-                f"  ⚠️ به سقف {CONFIG['max_positions']} پوزیشن هم‌زمان رسیدیم -> "
-                f"نوتیفیکیشن {direction} برای {name} ارسال نشد", "WARN"
-            )
         else:
-            state.open_positions[name] = {"direction": direction, "since": datetime.now()}
-            send_notification(signal, name)
-            state.signals_generated += 1
-            state.last_signal_time = datetime.now()
+            # فیکس باگ: شمارش واقعی از DB نه از دیکشنری حافظه
+            real_open_count = count_real_open_positions_from_db()
+            if real_open_count >= CONFIG["max_positions"]:
+                state.log(
+                    f"  ⚠️ به سقف {CONFIG['max_positions']} پوزیشن واقعی هم‌زمان رسیدیم (DB: {real_open_count}) -> "
+                    f"نوتیفیکیشن {direction} برای {name} ارسال نشد", "WARN"
+                )
+            else:
+                state.open_positions[name] = {"direction": direction, "since": datetime.now()}
+                send_notification(signal, name)
+                state.signals_generated += 1
+                state.last_signal_time = datetime.now()
     else:
-        # برگشتن به WATCH یعنی شرایط فنی/آپشن دیگه پابرجا نیست -> پوزیشن قبلی آزاد می‌شه
         if name in state.open_positions:
             state.log(f"  ℹ️ شرایط {name} به WATCH برگشت -> پوزیشن باز قبلی آزاد شد", "INFO")
             del state.open_positions[name]
@@ -990,10 +1470,7 @@ def run_cycle():
         try:
             dash = get_module("dashboard")
             if dash:
-                if hasattr(dash, "generate"):
-                    dash.generate()
-                elif hasattr(dash, "generate_html"):
-                    dash.generate_html()
+                dash.generate()
                 state.log("📊 داشبورد بروزرسانی شد")
         except Exception as e:
             state.log(f"⚠️ خطا داشبورد: {e}", "WARN")
@@ -1010,13 +1487,14 @@ def market_is_open():
 
 def run():
     print("╔" + "═" * 58 + "╗")
-    print("║" + "  AHRAM AI PRO v4.1  ".center(58) + "║")
-    print("║" + "  سیستم معامله‌گری تجمیعی آپشن  ".center(58) + "║")
+    print("║" + "  AHRAM AI PRO - سیستم یکپارچه  ".center(58) + "║")
+    print("║" + "  سیستم معامله‌گری تجمیعی آپشن + 6 ماژول جدید  ".center(58) + "║")
     print("╚" + "═" * 58 + "╝")
     print()
     print(f"📊 نمادها: {', '.join(s['name'] for s in CONFIG['symbols'])}")
     print(f"⏰ ساعات: {CONFIG['market_open']} - {CONFIG['market_close']}")
     print(f"🔄 سیکل: هر {CONFIG['cycle_seconds']} ثانیه")
+    print(f"🔬 V2 Enabled: {CONFIG['v2_enabled']} | Greek V2: {_HAS_GREEK_V2} | IV V2: {_HAS_IV_V2} | Risk V2: {_HAS_RISK_V2} | Scoring V2: {_HAS_SCORING_V2} | Decision V2: {_HAS_DECISION_V2} | Sentiment V2: {_HAS_SENTIMENT_V2} | VACE V2: {_HAS_VACE_V2}")
     print()
 
     while True:

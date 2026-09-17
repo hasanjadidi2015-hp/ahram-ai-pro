@@ -1,17 +1,10 @@
-# -*- coding: utf-8 -*-
 """
-اتصال نمایشی داده AHRAM به نسخه کاری داشبورد VIP - نسخه فیکس 2026-08-31
-
-فیکس‌های اصلی:
-1. XLSX is not defined → با تزریق stub در ابتدای <head> از ReferenceError جلوگیری می‌شود
-2. زنجیره AHRAM بدون نیاز به آپلود اکسل لود می‌شود (AHRAM_BRIDGE_DATA)
-3. حتی اگر کتابخانه XLSX داخلی خراب باشد، داشبورد با داده SQLite کار می‌کند
-
-ورودی‌ها:
-  options_dashboard_AHRAM.html
+اتصال داشبورد استراتژی + V2 (نسخه یکپارچه)
+ورودی:
+  options_dashboard_AHRAM.html (قالب اصلی)
   ahram_strategy_data.json
 خروجی:
-  options_dashboard_AHRAM_LIVE4.html
+  options_dashboard_AHRAM_LIVE4.html (قالب + زنجیره واقعی + V2/VACE/Sentiment)
 """
 
 import json
@@ -19,258 +12,233 @@ import os
 from html import escape
 
 TEMPLATE = "options_dashboard_AHRAM.html"
-DATA_FILE = "ahram_strategy_data.json"
-OUTPUT = "options_dashboard_AHRAM_LIVE4.html"
+# همیشه از قالب اصلی استفاده کن، نه خروجی قبلی، تا xlsx.js خراب نشه
 
+DATA_FILE = "ahram_strategy_data.json"
+OUTPUT_LIVE = "options_dashboard_AHRAM_LIVE4.html"
 
 def fmt(value):
     if value is None:
         return "—"
     try:
         return f"{float(value):,.0f}"
-    except (TypeError, ValueError):
+    except:
         return escape(str(value))
-
 
 def pct(value):
     if value is None:
         return "—"
     try:
         return f"{float(value):+.2f}%"
-    except (TypeError, ValueError):
+    except:
         return "—"
 
-
-def make_panel(payload):
+def make_v5_panel(payload):
     cards = []
     for name, data in payload.get("symbols", {}).items():
         if not data.get("available"):
-            cards.append(
-                f'<article class="ahram-card"><h3>{escape(name)}</h3>'
-                '<div class="ahram-muted">داده دیتابیس در دسترس نیست</div></article>'
-            )
+            cards.append(f'<div style="background:#0d1829;border:1px solid #334155;border-radius:13px;padding:14px;color:#94a3b8"><h3 style="margin:0;color:#f8fafc">{escape(name)}</h3><div>داده در دسترس نیست</div></div>')
             continue
-
         price = data.get("price") or {}
         signal = data.get("signal") or {}
+        v2 = data.get("v2_analysis") or {}
+        sentiment = data.get("sentiment_v2") or {}
+        vace = data.get("vace") or {}
         max_pain = data.get("max_pain") or []
         latest_mp = max_pain[0] if max_pain else {}
         signal_type = signal.get("signal_type") or "—"
         score = signal.get("score")
+        v2_score = signal.get("v2_score")
+        if v2_score is None and v2:
+            v2_score = v2.get("final_score")
+        v2_dec = signal.get("v2_decision") or (v2.get("decision") if v2 else "—")
+        v2_best = signal.get("v2_best_symbol") or "—"
+        if isinstance(v2.get("best_contract"), dict):
+            v2_best = v2.get("best_contract", {}).get("symbol", v2_best)
+
+        best_contract = v2.get("best_contract") if v2 else None
+        breakdown_html = ""
+        risks_html = ""
+        if best_contract and isinstance(best_contract, dict):
+            breakdown = best_contract.get("breakdown", [])
+            if breakdown:
+                breakdown_html = '<div style="margin:8px 0;padding:8px;background:#0f172a;border:1px dashed #4c1d95;border-radius:8px;font-size:11px">'
+                breakdown_html += '<b style="color:#c4b5fd">🔬 V2 Breakdown:</b><br>'
+                for b in breakdown[:5]:
+                    breakdown_html += f"<div style='color:#a5b4fc;margin:2px 0'>• {escape(str(b))}</div>"
+                breakdown_html += "</div>"
+            risks = v2.get("risks", [])
+            if risks:
+                risks_html = '<div style="margin:8px 0;padding:8px;background:#1a0f1f;border:1px dashed #7f1d1d;border-radius:8px;font-size:11px"><b>⚠️ RISK:</b><br>'
+                for r in risks[:2]:
+                    risks_html += f"<div style='color:#fca5a5;margin:2px 0'>• {escape(str(r))}</div>"
+                risks_html += "</div>"
+
+        # Sentiment
+        fg = sentiment.get("fear_greed", {}) if sentiment else {}
+        fg_val = fg.get("fear_greed")
+        fg_level = fg.get("level", "—")
+        fg_opp = fg.get("opportunity", "")
+        iran_vix = sentiment.get("iran_vix", {}) if sentiment else {}
+        vix_val = iran_vix.get("vix")
+        pc = sentiment.get("put_call_ratio", {}) if sentiment else {}
+        order_book = data.get("order_book") or sentiment.get("order_book", {}) if sentiment else {}
+
+        sentiment_html = ""
+        if fg_val is not None:
+            fg_color = "#22c55e" if fg_val <= 20 else ("#f59e0b" if fg_val >= 80 else "#a78bfa")
+            sentiment_html = f'''
+            <div style="margin:8px 0;padding:10px;background:linear-gradient(90deg,#1e1b4b,#0f172a);border:1px solid {fg_color};border-radius:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <b style="color:{fg_color}">😱 Fear & Greed Iran: {fmt(fg_val)}/100 {escape(str(fg_level))}</b>
+                <span style="background:{fg_color};color:#000;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:bold">{escape(str(fg_opp))}</span>
+              </div>
+              <div style="margin-top:6px;font-size:11px;color:#cbd5e1">
+                Iran VIX: {fmt(vix_val)}% · P/C OI: {fmt(pc.get('pc_oi'))} Vol: {fmt(pc.get('pc_volume'))} · {escape(str(pc.get('sentiment','')))}<br>
+                Order: {escape(str(order_book.get('market_state','')))} {fmt(order_book.get('imbalance_pct'))}% {escape(str(order_book.get('pressure','')))}<br>
+                {escape(str(fg_opp))}
+              </div>
+            </div>
+            '''
+
+        # VACE
+        vace_html = ""
+        if vace:
+            dyn_adx = vace.get("dynamic_adx", {})
+            atr_f = vace.get("atr_factor", {})
+            auto_sl = vace.get("auto_sl", {})
+            fibo_f = vace.get("fibo_filter", {})
+            vace_color = "#f59e0b" if not vace.get("confluence_ok") else "#10b981"
+            vace_html = f'''
+            <div style="margin:8px 0;padding:10px;background:linear-gradient(90deg,#1a1a2e,#0f172a);border:1px solid {vace_color};border-radius:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <b style="color:{vace_color}">🔬 VACE: ADX {fmt(dyn_adx.get('threshold'))} ATR×{fmt(atr_f.get('atr_factor'))} SL {fmt(auto_sl.get('sl_pct'))}%</b>
+                <span style="background:{vace_color};color:#000;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:bold">{escape(str(fibo_f.get('zone','')))} {'✅' if vace.get('confluence_ok') else '⛔'}</span>
+              </div>
+              <div style="margin-top:6px;font-size:11px;color:#cbd5e1">
+                ADX: {fmt(dyn_adx.get('current_adx'))} vs {fmt(dyn_adx.get('threshold'))} {'Trending' if dyn_adx.get('is_trending') else 'Ranging'} ({dyn_adx.get('history_count',0)} روز)<br>
+                Vol Ratio: {fmt(atr_f.get('vol_ratio'))} Adj: {fmt(atr_f.get('vol_adj'))} → Factor {fmt(atr_f.get('atr_factor'))}<br>
+                Fibo: {escape(str(fibo_f.get('reason',''))[:80])}<br>
+                {escape(str(vace.get('summary',''))[:120])}
+              </div>
+            </div>
+            '''
+
         options_count = len(data.get("options") or [])
         metrics = data.get("chain_metrics") or {}
+        iv_hist = data.get("iv_history") or []
+        iv_rank_info = f"IV History: {len(iv_hist)} روز" if iv_hist else ""
 
         mp_line = "Max Pain: —"
         if latest_mp:
-            mp_line = (
-                f"Max Pain: {fmt(latest_mp.get('max_pain_strike'))} "
-                f"· فاصله {pct(latest_mp.get('distance_pct'))}"
-            )
+            mp_line = f"Max Pain: {fmt(latest_mp.get('max_pain_strike'))} · فاصله {pct(latest_mp.get('distance_pct'))}"
 
-        cards.append(
-            f'''<article class="ahram-card">
-              <div class="ahram-card-title"><h3>{escape(name)}</h3>
-              <span class="ahram-signal">{escape(str(signal_type))}</span></div>
-              <div class="ahram-price">{fmt(price.get('last_price'))}<small>ریال</small></div>
-              <div class="ahram-row">امتیاز <b>{fmt(score)}</b></div>
-              <div class="ahram-row">زنجیره آخر <b>{options_count} قرارداد</b></div>
-              <div class="ahram-row">حجم Call / Put <b>{fmt(metrics.get('call_volume'))} / {fmt(metrics.get('put_volume'))}</b></div>
-              <div class="ahram-row">نسبت OI کال به پوت <b>{fmt(metrics.get('call_put_oi_ratio'))}</b></div>
-              <div class="ahram-row">نزدیک‌ترین Strike <b>{fmt(metrics.get('nearest_strike'))}</b></div>
-              <div class="ahram-row">فاصله از Strike نزدیک <b>{pct(metrics.get('nearest_strike_distance_pct'))}</b></div>
-              <div class="ahram-row">قرارداد دارای OI <b>{fmt(metrics.get('contracts_with_oi'))}</b></div>
-              <div class="ahram-row">کیفیت زنجیره <b>{escape(str(metrics.get('quality') or '—'))}</b></div>
-              <div class="ahram-row">{escape(mp_line)}</div>
-              <div class="ahram-row ahram-muted">زمان قیمت: {escape(str(price.get('time') or '—'))}</div>
-            </article>'''
-        )
+        v2_badge = f"<span style='background:#4c1d95;color:#c4b5fd;border-radius:999px;padding:5px 8px;font-size:11px;font-weight:bold'>V2 {fmt(v2_score)}/100 {escape(str(v2_dec))}</span>" if v2_score is not None else "<span style='background:#243147;color:#94a3b8;border-radius:999px;padding:5px 8px;font-size:11px'>V2 —</span>"
+
+        cards.append(f'''
+        <div style="background:linear-gradient(180deg,#1e1b4b,#0d1829);border:1px solid #4c1d95;border-radius:13px;padding:14px;color:#edf3ff">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0;font-size:16px;color:#f8fafc">{escape(name)}</h3>
+          <div><span style="background:#123c29;color:#86efac;border-radius:999px;padding:5px 8px;font-size:11px;font-weight:bold">{escape(str(signal_type))}</span> {v2_badge}</div></div>
+          <div style="font-size:26px;font-weight:900;margin:14px 0 8px;color:#f8fafc">{fmt(price.get('last_price'))}<small style="font-size:11px;color:#94a3b8;margin-right:5px">ریال</small></div>
+          <div style="border-top:1px solid #334155;padding:8px 0;color:#b6c4d8;font-size:12px">امتیاز قدیمی <b style="float:left;color:#f8fafc">{fmt(score)}</b></div>
+          <div style="border-top:1px solid #334155;padding:8px 0;color:#a78bfa;font-size:12px">🔬 CALL SCORE V2 <b style="float:left;color:#a78bfa">{fmt(v2_score)}/100</b> · {escape(str(v2_dec))} · {escape(str(v2_best))}</div>
+          {sentiment_html}
+          {vace_html}
+          {breakdown_html}
+          {risks_html}
+          <div style="border-top:1px solid #334155;padding:8px 0;color:#b6c4d8;font-size:12px">زنجیره <b style="float:left;color:#f8fafc">{options_count} قرارداد</b></div>
+          <div style="border-top:1px solid #334155;padding:8px 0;color:#b6c4d8;font-size:12px">Call/Put Vol <b style="float:left;color:#f8fafc">{fmt(metrics.get('call_volume'))} / {fmt(metrics.get('put_volume'))}</b></div>
+          <div style="border-top:1px solid #334155;padding:8px 0;color:#b6c4d8;font-size:12px">OI Ratio <b style="float:left;color:#f8fafc">{fmt(metrics.get('call_put_oi_ratio'))}</b></div>
+          <div style="border-top:1px solid #334155;padding:8px 0;color:#b6c4d8;font-size:12px">{escape(mp_line)}</div>
+          <div style="border-top:1px solid #334155;padding:8px 0;color:#94a3b8;font-size:11px">{escape(iv_rank_info)} · {escape(str(price.get('time') or '—'))}</div>
+        </div>
+        ''')
 
     payload_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     payload_json = payload_json.replace("<", "\\u003c")
 
-    # فیکس 2026-08-31: لودر مقاوم که بدون XLSX هم کار می‌کند
-    return f'''<section id="ahram-bridge-panel" dir="rtl">
-      <div class="ahram-head">
-        <div><h2>🔗 داده واقعی AHRAM AI</h2>
-        <p>اتصال نمایشی و فقط‌خواندنی · بدون اثر بر سیگنال‌ها · XLSX resilient + بدون نیاز به آپلود</p></div>
-        <span class="ahram-readonly">READ ONLY</span>
+    return f'''
+    <div id="ahram-bridge-panel" dir="rtl" style="margin:24px auto;padding:20px;max-width:1440px;background:linear-gradient(180deg,#1e1b4b,#111c2e);border:1px solid #4c1d95;border-radius:18px;color:#edf3ff;font-family:Tahoma,Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px solid #4c1d95;padding-bottom:14px;margin-bottom:14px">
+        <div><h2 style="margin:0 0 5px;font-size:19px;color:#a78bfa">🔬 AHRAM AI PRO - Option Decision + Sentiment + VACE</h2>
+        <p style="margin:0;color:#94a3b8;font-size:12px">Greek + IV + Risk + Scoring + Decision + Sentiment + VACE (ADX Dyn + ATR Dyn + Fibo No-Trade + Break-Even)</p></div>
+        <span style="background:#4c1d95;color:#c4b5fd;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:bold">V2 + VACE فعال</span>
       </div>
-      <div class="ahram-grid">{"".join(cards)}</div>
-      <div class="ahram-note">✅ این پنل بدون نیاز به اکسل کار می‌کند. اگر کتابخانه XLSX لود نشد، زنجیره از SQLite لود می‌شود و استراتژی‌ها ساخته می‌شوند. WATCH دائمی بخاطر XLSX is not defined حل شد.</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">{"".join(cards)}</div>
+      <div style="margin-top:14px;padding:11px;background:#1e1b4b;color:#c4b5fd;border:1px solid #4c1d95;border-radius:10px;font-size:12px">VACE: ADX Dyn = Percentile_50(ADX,300) - ATR Factor = 3.8+0.8*VolAdj - SL Auto = -3.5*SMA(ATRpct,50) bounded -5%..-20% - Fibo Mid Zone 38.2-61.8% No Trade - Break-Even 8.5% - Tiered TP 30/30/40%</div>
       <script id="ahram-bridge-data">window.AHRAM_BRIDGE_DATA = {payload_json};</script>
       <script id="ahram-chain-loader">
-      (function() {{
-        function tryLoadAhramChain(attempt) {{
-          try {{
-            // اگر XLSX هنوز undefined است، stub بساز تا خطا ندهد
-            if(typeof XLSX === "undefined" && typeof window.XLSX === "undefined") {{
-              console.warn("⚠️ XLSX undefined - ساخت stub موقت برای جلوگیری از crash");
-              window.XLSX = {{
-                version: "stub-2026-08-31",
-                utils: {{
-                  json_to_sheet: function(){{return {{}};}},
-                  book_new: function(){{return {{}};}},
-                  book_append_sheet: function(){{}},
-                  sheet_to_json: function(){{return [];}},
-                  aoa_to_sheet: function(){{return {{}};}}
-                }},
-                read: function(){{throw new Error("XLSX stub - Excel disabled, using AHRAM SQLite");}},
-                writeFile: function(){{ if(typeof showToast==="function") showToast("⚠️ XLSX لود نشده - خروجی اکسل نیاز به اینترنت دارد"); }}
+      window.addEventListener("DOMContentLoaded", function () {{
+        try {{
+          const data = window.AHRAM_BRIDGE_DATA || {{}};
+          const symbols = data.symbols || {{}};
+          const calls = [], puts = [];
+          const stocks = {{}};
+          Object.keys(symbols).forEach(function (name) {{
+            const item = symbols[name] || {{}};
+            const price = item.price || {{}};
+            stocks[name] = Number(price.last_price || price.closing_price || 0);
+            (item.options || []).forEach(function (o) {{
+              const x = {{
+                sym: o.symbol, u: name, S: stocks[name], K: Number(o.strike_price || 0),
+                P: Number(o.option_price || 0), last: Number(o.option_price || 0),
+                close: Number(o.option_price || 0), expiry: o.expire_date || "",
+                days: Number(o.days_to_expire || 0), vol: Number(o.volume || 0),
+                bid: 0, ask: 0, live: false, source: "AHRAM SQLite",
+                iv: o.implied_volatility, delta: o.delta, gamma: o.gamma, theta: o.theta, vega: o.vega
               }};
-            }}
-            const data = window.AHRAM_BRIDGE_DATA || {{}};
-            const symbols = data.symbols || {{}};
-            const calls = [], puts = [];
-            const stocks = {{}};
-            Object.keys(symbols).forEach(function (name) {{
-              const item = symbols[name] || {{}};
-              const price = item.price || {{}};
-              stocks[name] = Number(price.last_price || price.closing_price || 0);
-              (item.options || []).forEach(function (o) {{
-                const x = {{
-                  sym: o.symbol, u: name, S: stocks[name], K: Number(o.strike_price || 0),
-                  P: Number(o.option_price || 0), last: Number(o.option_price || 0),
-                  close: Number(o.option_price || 0), expiry: o.expire_date || "",
-                  days: Number(o.days_to_expire || 0), vol: Number(o.volume || 0),
-                  bid: 0, ask: 0, live: false, source: "AHRAM SQLite"
-                }};
-                if (String(o.option_type || "").toUpperCase() === "PUT") puts.push(x);
-                else calls.push(x);
-              }});
+              if (String(o.option_type || "").toUpperCase() === "PUT") puts.push(x);
+              else calls.push(x);
             }});
-            if (!(calls.length || puts.length)) {{
-              console.warn("AHRAM chain loader: no options found, attempt", attempt);
-              if(attempt < 5) setTimeout(function(){{ tryLoadAhramChain(attempt+1); }}, 1000);
-              return;
-            }}
-            // اگر توابع اصلی هنوز لود نشدند (چون XLSX خراب بوده)، صبر کن
-            if(typeof syncUnderlyingToOptions !== "function" || typeof buildAllStrategies !== "function" || typeof renderAllPages !== "function") {{
-              console.warn("AHRAM loader waiting for core funcs, attempt", attempt);
-              if(attempt < 15) setTimeout(function(){{ tryLoadAhramChain(attempt+1); }}, 800);
-              return;
-            }}
-            // اطمینان از وجود allStocksMap
-            if(typeof allStocksMap === "undefined") window.allStocksMap = {{}};
-            if(typeof allOptions === "undefined") window.allOptions = [];
-            if(typeof allPuts === "undefined") window.allPuts = [];
-            
-            allStocksMap = Object.assign({{}}, allStocksMap || {{}}, stocks);
-            allOptions = calls;
-            allPuts = puts;
-            if(typeof liveOptionQuoteMode !== "undefined") liveOptionQuoteMode = false;
-            syncUnderlyingToOptions();
-            buildAllStrategies();
-            renderAllPages();
-            if (typeof renderSymbolDive === "function") renderSymbolDive();
-            if (typeof populateSymbolSelector === "function") populateSymbolSelector();
-            if (typeof renderLiveTicker === "function") renderLiveTicker();
-            if (typeof showToast === "function") showToast("✅ زنجیره واقعی AHRAM (" + calls.length + " Call + " + puts.length + " Put) بدون نیاز به اکسل بارگذاری شد - XLSX resilient");
-            console.log("✅ AHRAM bridge loaded (resilient):", calls.length, "calls", puts.length, "puts", "stocks", Object.keys(stocks));
-          }} catch (err) {{
-            console.warn("AHRAM chain loader error attempt", attempt, err);
-            if(attempt < 10) setTimeout(function(){{ tryLoadAhramChain(attempt+1); }}, 1000);
-          }}
-        }}
-        // اجرای مقاوم
-        if(document.readyState === "loading") {{
-          window.addEventListener("DOMContentLoaded", function(){{ 
-            setTimeout(function(){{ tryLoadAhramChain(0); }}, 500);
           }});
-        }} else {{
-          setTimeout(function(){{ tryLoadAhramChain(0); }}, 300);
-        }}
-        // تلاش‌های مجدد برای مواقعی که XLSX دیر لود می‌شود یا اصلاً لود نمی‌شود
-        setTimeout(function(){{ tryLoadAhramChain(1); }}, 2000);
-        setTimeout(function(){{ tryLoadAhramChain(2); }}, 5000);
-      }})();
+          if (calls.length || puts.length) {{
+            if (typeof allStocksMap !== 'undefined') allStocksMap = Object.assign(allStocksMap || {{}}, stocks);
+            if (typeof allOptions !== 'undefined') allOptions = calls;
+            if (typeof allPuts !== 'undefined') allPuts = puts;
+            if (typeof liveOptionQuoteMode !== 'undefined') liveOptionQuoteMode = false;
+            if (typeof syncUnderlyingToOptions === 'function') syncUnderlyingToOptions();
+            if (typeof buildAllStrategies === 'function') buildAllStrategies();
+            if (typeof renderAllPages === 'function') renderAllPages();
+            if (typeof renderSymbolDive === 'function') renderSymbolDive();
+            if (typeof showToast === 'function') showToast("✅ AHRAM: 7 موتور + زنجیره واقعی بارگذاری شد");
+          }}
+          console.log("AHRAM Bridge Data:", data);
+        }} catch (err) {{ console.warn("AHRAM loader:", err); }}
+      }});
       </script>
-    </section>'''
-
-
-def inject_xlsx_resilience(template_html):
-    """
-    تزریق stub برای XLSX در ابتدای head تا ReferenceError رخ ندهد
-    و اضافه کردن fallback CDN
-    """
-    # استاب اولیه - باید قبل از هر اسکریپت دیگری باشد
-    xlsx_stub = '''
-<!-- FIX 2026-08-31: XLSX resilience stub - جلوگیری از XLSX is not defined -->
-<script>
-(function(){
-  // اگر XLSX بعد از لود کتابخانه داخلی هنوز undefined بود، stub بساز
-  window._ahramXlsxCheck = function(){
-    if(typeof XLSX === "undefined" && typeof window.XLSX === "undefined"){
-      console.warn("⚠️ XLSX still undefined - injecting stub to prevent crash");
-      window.XLSX = {
-        version: "stub-resilient",
-        utils: {
-          json_to_sheet: function(){return {};},
-          book_new: function(){return {};},
-          book_append_sheet: function(){},
-          sheet_to_json: function(){return [];},
-          aoa_to_sheet: function(){return {};},
-          table_to_sheet: function(){return {};}
-        },
-        read: function(){throw new Error("XLSX stub");},
-        writeFile: function(){}
-      };
-    }
-    window._ahramXlsxReady = typeof XLSX !== "undefined" && XLSX.version !== "stub-resilient";
-  };
-  // چک اولیه
-  setTimeout(window._ahramXlsxCheck, 100);
-  setTimeout(window._ahramXlsxCheck, 2000);
-})();
-</script>
-'''
-
-    # تزریق بعد از <head>
-    lower = template_html.lower()
-    head_pos = lower.find("<head>")
-    if head_pos != -1:
-        insert_at = head_pos + len("<head>")
-        template_html = template_html[:insert_at] + xlsx_stub + template_html[insert_at:]
-    
-    # همچنین گارد برای تمام جاهایی که مستقیم XLSX.read یا XLSX.utils صدا می‌زنند
-    # این کار را با جایگزینی هوشمند انجام می‌دهیم تا کرش نکند
-    # اما چون فایل بزرگ است، فقط stub کافی است چون typeof چک در کدهای جدید هست
-    
-    return template_html
-
+    </div>
+    '''
 
 def main():
+    global DATA_FILE
     if not os.path.exists(TEMPLATE):
-        raise FileNotFoundError(f"فایل قالب پیدا نشد: {TEMPLATE}")
+        raise FileNotFoundError(f"قالب پیدا نشد: {TEMPLATE}")
+
     if not os.path.exists(DATA_FILE):
-        raise FileNotFoundError(f"فایل داده پیدا نشد: {DATA_FILE}")
+        raise FileNotFoundError(f"فایل داده پیدا نشد: {DATA_FILE} - اول strategy_bridge.py رو اجرا کن")
 
-    with open(TEMPLATE, "r", encoding="utf-8") as file:
-        template = file.read()
-    with open(DATA_FILE, "r", encoding="utf-8") as file:
-        payload = json.load(file)
+    with open(TEMPLATE, "r", encoding="utf-8") as f:
+        template = f.read()
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        payload = json.load(f)
 
-    if "</body>" not in template.lower():
-        raise ValueError("قالب HTML تگ پایان body ندارد")
+    panel = make_v5_panel(payload)
+    # بدون تگ <style> جدا - همه استایل‌ها inline داخل پنل هستن تا CSS به صورت متن نمایش داده نشه
 
-    # تزریق resilience برای XLSX
-    template = inject_xlsx_resilience(template)
+    # تزریق فقط پنل به body
+    lower = template.lower()
+    body_at = lower.rfind("</body>")
+    if body_at < 0:
+        raise ValueError("قالب HTML تگ body ندارد")
 
-    panel = make_panel(payload)
-
-    # پنل را قبل از </body> تزریق کن
-    body_at = template.lower().rfind("</body>")
     output = template[:body_at] + panel + template[body_at:]
-    
-    with open(OUTPUT, "w", encoding="utf-8") as file:
-        file.write(output)
 
-    print("✅ نسخه نمایشی AHRAM ساخته شد - XLSX resilient")
-    print("OUTPUT:", OUTPUT)
-    print("ORIGINAL_UNCHANGED:", TEMPLATE)
-    print("READ_ONLY_PANEL: True")
-    print("XLSX_RESILIENT: True - بدون نیاز به آپلود اکسل زنجیره لود می‌شود")
-    print("FIX: XLSX is not defined حل شد - حتی اگر کتابخانه اکسل لود نشد، WATCH دائمی تمام می‌شود")
+    with open(OUTPUT_LIVE, "w", encoding="utf-8") as f:
+        f.write(output)
 
+    print("✅ داشبورد یکپارچه ساخته شد")
+    print("OUTPUT:", OUTPUT_LIVE)
+    print("PANEL: True - 7 موتور فعال")
 
 if __name__ == "__main__":
     main()
