@@ -1,43 +1,127 @@
-<!doctype html>
-<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="20"><title>AHRAM AI PRO</title>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="20">
+<title>AHRAM AI PRO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0b1220;--panel:#111c2e;--panel2:#17263d;--line:#263750;--text:#edf3ff;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--blue:#38bdf8;--purple:#a78bfa}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#09111e,#0b1220 48%,#101827);color:var(--text);font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-size:14px}.shell{max-width:1440px;margin:auto;padding:22px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:18px}h1{font-size:22px;margin:0}.sub,.muted{color:var(--muted)}.status{display:flex;gap:8px;flex-wrap:wrap}.status span,.chip,.pill{border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;white-space:nowrap}.status span{background:#152238;color:#cbd5e1}.live{color:#86efac!important}.live:before{content:'●';margin-left:5px}.hero{margin:18px 0;display:grid;grid-template-columns:1.1fr 2fr;gap:14px}.hero-main,.hero-detail,.symbol-card,.panel,.position-card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px}.hero-main{padding:18px;border-right:5px solid var(--green)}.hero-main.sell{border-color:var(--red)}.hero-main.watch,.hero-main.muted{border-color:var(--orange)}.hero-label,.eyebrow{color:var(--muted);font-size:12px}.hero-action{font-size:28px;font-weight:900;margin-top:7px}.hero-detail{padding:18px;display:flex;align-items:center;color:#d8e3f4}.symbol-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.symbol-card{padding:16px;min-width:0}.symbol-card.buy{border-top:3px solid var(--green)}.symbol-card.sell{border-top:3px solid var(--red)}.symbol-card.watch,.symbol-card.muted{border-top:3px solid var(--orange}}.card-head,.position-main{display:flex;justify-content:space-between;align-items:center;gap:8px}h3{margin:0;font-size:17px}.price{font-size:29px;font-weight:900;margin:15px 0 10px}.price small{font-size:11px;color:var(--muted);margin-right:5px}.score{display:flex;justify-content:space-between;color:var(--muted)}.score.v2{color:var(--purple);margin-top:6px}.score b{color:var(--text)}.score.v2 b{color:var(--purple)}.meter,.track{height:7px;background:#223049;border-radius:9px;overflow:hidden;margin:8px 0 13px}.meter.v2{height:5px}.meter i,.track i{display:block;height:100%;background:var(--blue);border-radius:9px}.meter i.buy{background:var(--green)}.meter i.sell{background:var(--red)}.meter i.watch,.meter i.muted{background:var(--orange)}.contract{font-size:12px;border-top:1px solid var(--line);padding-top:11px;color:#d5dfef;min-height:38px}.v2-breakdown{font-size:11px;background:#0d1829;border:1px dashed #2a3a5a;border-radius:8px;padding:8px;margin:8px 0;color:#cbd5e1}.v2-item{color:#a5b4fc}.v2-risk{color:#fca5a5}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.pill.buy,.chip.buy{background:#123c29;color:#86efac}.pill.sell,.chip.sell{background:#4a1c25;color:#fca5a5}.pill.watch,.chip.watch{background:#4a3512;color:#fcd34d}.pill.muted,.chip.muted{background:#243147;color:#b6c4d8}.pill.info{background:#163a56;color:#7dd3fc}.grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:18px}.panel{padding:16px}.panel h2{font-size:15px;margin:0 0 13px}.position-card{padding:14px;margin-bottom:10px;background:#0d1829}.position-card strong{font-size:21px;display:block;margin-top:4px}.buy{color:#86efac}.sell{color:#fca5a5}.watch{color:#fcd34d}.track{position:relative;margin:13px 0 17px}.track i{background:linear-gradient(90deg,var(--red),var(--blue),var(--green))}.track span{position:absolute;top:11px;color:var(--muted);font-size:10px}.track .entry{right:42%}.track .t1{left:0}.position-data{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;font-size:11px;color:var(--muted)}.position-data b{display:block;color:var(--text);font-size:13px;margin-top:3px}.alert{display:flex;gap:9px;padding:10px;border-bottom:1px solid var(--line)}.alert:last-child{border:0}.alert b{min-width:45px}.alert.buy{border-right:3px solid var(--green)}.alert.sell{border-right:3px solid var(--red)}.alert.watch{border-right:3px solid var(--orange)}.news-row{display:grid;grid-template-columns:92px 55px 105px 1fr;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}.news-time,.news-cat{color:var(--muted)}.news-name{font-weight:bold}.maxpain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.maxpain-card{background:#0d1829;border:1px solid var(--line);border-radius:12px;padding:12px}.maxpain-card h3{margin-bottom:8px}.maxpain-row{display:grid;grid-template-columns:1fr .8fr 1.2fr auto;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:11px}.maxpain-row:last-child{border-bottom:0}.maxpain-row b{color:var(--text)}.maxpain-row em{font-style:normal;color:#86efac;font-size:10px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.stat{background:var(--panel);border:1px solid var(--line);padding:14px;border-radius:13px}.stat span{color:var(--muted);font-size:12px}.stat b{font-size:23px;display:block;margin-top:5px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:right;font-size:12px}th{color:var(--muted);font-weight:600}.history{margin-top:18px}.empty-state{color:var(--muted);padding:18px;text-align:center}.info-text{color:#7dd3fc}@media(max-width:850px){.hero,.grid2{grid-template-columns:1fr}.symbol-grid{grid-template-columns:1fr}.maxpain-grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.position-data{grid-template-columns:repeat(3,1fr)}.news-row{grid-template-columns:75px 45px 1fr}.news-row span:last-child{grid-column:1/-1}.hide-mobile{display:none}.stats{grid-template-columns:repeat(2,1fr)}}
-</style></head><body><main class="shell">
-<header class="top"><div><h1>🚀 AHRAM AI PRO - Option Decision System</h1><div class="sub">داشبورد با CALL SCORE + Breakdown + RISK · فقط نمایش داده‌های فعلی ربات</div></div><div class="status"><span class="live">سیستم فعال</span><span>به‌روزرسانی 20 ثانیه</span><span>2026-09-17 13:27:44</span></div></header>
-<section class="hero"><div class="hero-main watch"><div class="hero-label">بهترین اقدام فعلی (قدیمی)</div><div class="hero-action">تحت نظر</div></div><div class="hero-detail">فعلاً شرایط ورود تازه تأیید نشده است.</div></section>
-<section class="symbol-grid"><article class="symbol-card watch">
-          <div class="card-head"><h3>اهرم</h3><span class="pill watch">تحت نظر</span></div>
-          <div class="price">74,570<small>ریال</small></div>
-          <div class="score"><span>امتیاز قدیمی</span><b>9/100</b></div>
-          <div class="meter"><i class="watch" style="width:9.0%"></i></div>
-          <div class="score v2"><span>🔬 CALL SCORE V2</span><b>—</b> <small>— · —</small></div>
-          <div class="meter v2"><i class="buy" style="width:0%"></i></div>
-          <div class="contract">بدون قرارداد منتخب</div>
+:root{
+  --bg:#0E1013; --surface:#171A1F; --surface-2:#1D2128;
+  --accent:#C99A3E; --good:#4CAE8C; --bad:#D66A5C; --muted:#7D8590;
+  --text:#EDEBE6; --text-dim:#9BA1AC; --border:#2A2D33;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Vazirmatn',Tahoma,sans-serif;
+  font-feature-settings:'tnum' 1;line-height:1.6;padding:28px 20px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;
+  margin-bottom:26px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+header h1{font-size:22px;font-weight:700;margin:0;letter-spacing:.2px}
+header .meta{color:var(--text-dim);font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:28px}
+.card{background:var(--surface);border:1px solid var(--border);border-right:4px solid var(--muted);
+  border-radius:10px;padding:18px 20px}
+.card.buy{border-right-color:var(--good)}
+.card.sell{border-right-color:var(--bad)}
+.card.watch{border-right-color:var(--accent)}
+.card-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.card-top h2{font-size:17px;font-weight:600;margin:0;color:var(--text)}
+.price{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.price .unit{font-size:12px;font-weight:400;color:var(--text-dim)}
+.signal-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.badge{display:inline-block;padding:5px 14px;border-radius:999px;font-size:13px;font-weight:600}
+.badge.buy{background:rgba(76,174,140,.15);color:var(--good)}
+.badge.sell{background:rgba(214,106,92,.15);color:var(--bad)}
+.badge.watch{background:rgba(201,154,62,.15);color:var(--accent)}
+.badge.muted{background:rgba(125,133,144,.15);color:var(--muted)}
+.score-num{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-dim)}
+.score-bar{height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-bottom:14px}
+.score-fill{height:100%;border-radius:99px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;padding:4px 10px;border-radius:7px;background:var(--surface-2);color:var(--text-dim)}
+.chip.buy{color:var(--good)}
+.chip.sell{color:var(--bad)}
+.contract{margin-top:14px;padding:12px 14px;background:var(--surface-2);border-radius:8px}
+.contract-head{font-size:14px;font-weight:600;margin-bottom:6px}
+.contract-targets{display:flex;gap:8px;flex-wrap:wrap}
+.mini{font-size:12px;padding:3px 9px;border-radius:6px;font-weight:600;font-variant-numeric:tabular-nums}
+.mini.good{background:rgba(76,174,140,.15);color:var(--good)}
+.mini.bad{background:rgba(214,106,92,.15);color:var(--bad)}
+section.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:18px 20px;margin-bottom:16px}
+section.panel h3{font-size:15px;font-weight:600;margin:0 0 14px}
+.pos-row{display:grid;grid-template-columns:70px 100px 1fr 1fr 80px 90px;gap:10px;align-items:center;
+  padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.pos-row:last-child{border-bottom:none}
+.pos-stock{font-weight:600}
+.pos-sym{color:var(--text-dim);font-variant-numeric:tabular-nums}
+.pos-entry,.pos-current{color:var(--text-dim);font-variant-numeric:tabular-nums}
+.pos-pct{font-weight:700;font-variant-numeric:tabular-nums}
+.pos-pct.good{color:var(--good)}
+.pos-pct.bad{color:var(--bad)}
+.pos-status{color:var(--text-dim);font-size:12px}
+.empty{color:var(--text-dim);font-size:13px}
+.footer-bar{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--text-dim);font-size:12px;
+  padding-top:10px}
+@media(max-width:640px){
+  .pos-row{grid-template-columns:1fr 1fr;row-gap:4px}
+}
+</style>
+</head><body>
+<div class="wrap">
+<header>
+  <h1>AHRAM AI PRO</h1>
+  <span class="meta">به‌روزرسانی خودکار هر 20 ثانیه · آخرین بروزرسانی 2026-09-19 01:51:43</span>
+</header>
+<div class="cards">
+        <article class="card watch">
+          <div class="card-top">
+            <h2>اهرم</h2>
+            <div class="price">74,570<span class="unit"> ریال</span></div>
+          </div>
+          <div class="signal-row">
+            <span class="badge watch">تحت نظر</span>
+            <span class="score-num">9</span>
+          </div>
+          <div class="score-bar"><div class="score-fill" style="width:9.0%;background:var(--accent)"></div></div>
+          <div class="chips"><span class="chip sell">🔴 فشار فروش (-46.1٪)</span><span class="chip muted">🧲 دیواره 62,000 (کال‌سنگین)</span></div>
           
-          <div class="chips"><span class="chip sell">🔴 فشار فروش (-46.1٪)</span><span class="chip muted">γ دیواره 62,000 · کال‌سنگین</span><span class="chip muted">Greeks پیشرفته: در انتظار داده</span></div>
-        </article><article class="symbol-card watch">
-          <div class="card-head"><h3>وبملت</h3><span class="pill watch">تحت نظر</span></div>
-          <div class="price">1,592<small>ریال</small></div>
-          <div class="score"><span>امتیاز قدیمی</span><b>38/100</b></div>
-          <div class="meter"><i class="watch" style="width:38.0%"></i></div>
-          <div class="score v2"><span>🔬 CALL SCORE V2</span><b>—</b> <small>— · —</small></div>
-          <div class="meter v2"><i class="buy" style="width:0%"></i></div>
-          <div class="contract">بدون قرارداد منتخب</div>
+        </article>
+        <article class="card watch">
+          <div class="card-top">
+            <h2>وبملت</h2>
+            <div class="price">1,592<span class="unit"> ریال</span></div>
+          </div>
+          <div class="signal-row">
+            <span class="badge watch">تحت نظر</span>
+            <span class="score-num">38</span>
+          </div>
+          <div class="score-bar"><div class="score-fill" style="width:38.0%;background:var(--accent)"></div></div>
+          <div class="chips"><span class="chip sell">🔴 فشار فروش (-65.2٪)</span><span class="chip muted">🧲 دیواره 1,454 (کال‌سنگین)</span></div>
           
-          <div class="chips"><span class="chip sell">🔴 فشار فروش (-65.2٪)</span><span class="chip muted">γ دیواره 1,454 · کال‌سنگین</span><span class="chip muted">Greeks پیشرفته: در انتظار داده</span></div>
-        </article><article class="symbol-card watch">
-          <div class="card-head"><h3>شستا</h3><span class="pill watch">تحت نظر</span></div>
-          <div class="price">3,700<small>ریال</small></div>
-          <div class="score"><span>امتیاز قدیمی</span><b>44/100</b></div>
-          <div class="meter"><i class="watch" style="width:44.0%"></i></div>
-          <div class="score v2"><span>🔬 CALL SCORE V2</span><b>—</b> <small>— · —</small></div>
-          <div class="meter v2"><i class="buy" style="width:0%"></i></div>
-          <div class="contract">بدون قرارداد منتخب</div>
+        </article>
+        <article class="card watch">
+          <div class="card-top">
+            <h2>شستا</h2>
+            <div class="price">3,700<span class="unit"> ریال</span></div>
+          </div>
+          <div class="signal-row">
+            <span class="badge watch">تحت نظر</span>
+            <span class="score-num">44</span>
+          </div>
+          <div class="score-bar"><div class="score-fill" style="width:44.0%;background:var(--accent)"></div></div>
+          <div class="chips"><span class="chip buy">🔥 صف خرید قفل‌شده</span><span class="chip muted">🧲 دیواره 3,250 (کال‌سنگین)</span></div>
           
-          <div class="chips"><span class="chip buy">🔥 صف خرید قفل‌شده</span><span class="chip muted">γ دیواره 3,250 · کال‌سنگین</span><span class="chip muted">Greeks پیشرفته: در انتظار داده</span></div>
-        </article></section>
-<section class="panel" style="margin-top:18px"><h2>📍 Max Pain اکتشافی <span class="sub">(صرفاً اطلاعاتی)</span></h2><div class="maxpain-grid"><div class="maxpain-card"><h3>اهرم</h3><div class="maxpain-row"><span>1405/08/27</span><b>30,000</b><span>فاصله +47.5%</span><em>HIGH</em></div><div class="maxpain-row"><span>1405/07/29</span><b>50,000</b><span>فاصله +12.5%</span><em>HIGH</em></div><div class="maxpain-row"><span>1405/06/25</span><b>42,000</b><span>فاصله +26.5%</span><em>HIGH</em></div></div><div class="maxpain-card"><h3>وبملت</h3><div class="maxpain-row"><span>1405/08/20</span><b>800</b><span>فاصله +46.1%</span><em>HIGH</em></div><div class="maxpain-row"><span>1405/07/22</span><b>1,054</b><span>فاصله +28.9%</span><em>HIGH</em></div><div class="maxpain-row"><span>1405/08/20</span><b>800</b><span>فاصله +47.3%</span><em>HIGH</em></div></div><div class="maxpain-card"><h3>شستا</h3><div class="maxpain-row"><span>1405/09/11</span><b>1,900</b><span>فاصله +35.2%</span><em>MEDIUM</em></div><div class="maxpain-row"><span>1405/08/13</span><b>1,600</b><span>فاصله +45.4%</span><em>HIGH</em></div><div class="maxpain-row"><span>1405/07/15</span><b>2,800</b><span>فاصله +4.5%</span><em>HIGH</em></div></div></div></section>
-<section class="grid2"><div class="panel"><h2>📌 پوزیشن‌های باز</h2><div class="empty-state">پوزیشن بازی وجود ندارد.</div></div><div class="panel"><h2>⚠️ هشدارها و وضعیت تابلو</h2><div class="alert sell"><b>اهرم</b><span>🔴 فشار فروش (-46.1٪)</span></div><div class="alert sell"><b>وبملت</b><span>🔴 فشار فروش (-65.2٪)</span></div><div class="alert buy"><b>شستا</b><span>🔥 صف خرید قفل‌شده</span></div></div></section>
-<section class="grid2"><div class="panel"><h2>📰 آخرین رویدادهای رسمی</h2><div class="news-row"><span class="news-time">2026-09-16</span><span class="news-name">اهرم</span><span class="news-cat">سایر</span><span>پايان دوره معاملاتي اختيار معاملات (اهرم) در سررسيد شهريور ماه 1405</span></div><div class="news-row"><span class="news-time">2026-09-16</span><span class="news-name">اهرم</span><span class="news-cat">تسویه اختیار معامله</span><span>اطلاعيه درخصوص تسويه فيزيكي اختيارمعاملات (اهرم) در سررسيد شهريور 1405</span></div><div class="news-row"><span class="news-time">2026-09-16</span><span class="news-name">اهرم</span><span class="news-cat">سایر</span><span>پايان دوره معاملاتي قرارداد آتي اهرم (جهرم0506) با سررسيد شهريور 1405</span></div><div class="news-row"><span class="news-time">2026-09-16</span><span class="news-name">اهرم</span><span class="news-cat">تسویه اختیار معامله</span><span>اطلاعيه تسويه نهايي آتي صندوق اهرم (جهرم0506) با سررسيد شهريور ماه 1405</span></div><div class="news-row"><span class="news-time">2026-09-16</span><span class="news-name">اهرم</span><span class="news-cat">سایر</span><span>پايان دوره معاملاتي اختيار معاملات (اهرم) در سررسيد شهريور ماه 1405</span></div></div><div class="panel"><h2>🧠 وضعیت یادگیری</h2><div class="stats"><div class="stat"><span>کل رکوردها</span><b>2159</b></div><div class="stat"><span>برد / باخت</span><b>6 / 3</b></div><div class="stat"><span>نرخ برد</span><b>66.7٪</b></div><div class="stat"><span>پوزیشن باز</span><b>0</b></div></div><div class="sub" style="margin-top:12px;font-size:11px">V5: ستون V2 Score برای بک‌تست سیستم جدید.</div></div></section>
-<section class="panel history"><h2>📜 آخرین تصمیم‌ها <span class="sub">(۱۲ رکورد آخر - قدیمی + V2)</span></h2><table><thead><tr><th>زمان</th><th>نماد</th><th>تصمیم قدیمی</th><th>امتیاز قدیمی</th><th>V2 Score</th><th class="hide-mobile">قرارداد</th><th>نتیجه</th></tr></thead><tbody><tr><td>12:28</td><td>شستا</td><td><span class='pill watch'>تحت نظر</span></td><td>44</td><td>—</td><td>—</td><td>—</td></tr><tr><td>12:28</td><td>وبملت</td><td><span class='pill watch'>تحت نظر</span></td><td>38</td><td>—</td><td>—</td><td>—</td></tr><tr><td>12:28</td><td>اهرم</td><td><span class='pill watch'>تحت نظر</span></td><td>9.0</td><td>—</td><td>—</td><td>—</td></tr><tr><td>12:23</td><td>شستا</td><td><span class='pill buy'>خرید کال</span></td><td>56</td><td>—</td><td>ضستا7064</td><td>—</td></tr><tr><td>12:23</td><td>وبملت</td><td><span class='pill buy'>خرید کال</span></td><td>48</td><td>—</td><td>ضملت8076</td><td>—</td></tr><tr><td>12:22</td><td>اهرم</td><td><span class='pill watch'>تحت نظر</span></td><td>9.0</td><td>—</td><td>—</td><td>—</td></tr><tr><td>12:17</td><td>شستا</td><td><span class='pill buy'>خرید کال</span></td><td>52</td><td>—</td><td>ضستا8061</td><td>—</td></tr><tr><td>12:17</td><td>وبملت</td><td><span class='pill buy'>خرید کال</span></td><td>49</td><td>—</td><td>ضملت8076</td><td>—</td></tr><tr><td>12:17</td><td>اهرم</td><td><span class='pill watch'>تحت نظر</span></td><td>12.0</td><td>—</td><td>—</td><td>—</td></tr><tr><td>12:12</td><td>شستا</td><td><span class='pill buy'>خرید کال</span></td><td>52</td><td>—</td><td>ضستا8061</td><td>—</td></tr><tr><td>12:12</td><td>وبملت</td><td><span class='pill watch'>تحت نظر</span></td><td>29</td><td>—</td><td>—</td><td>—</td></tr><tr><td>12:12</td><td>اهرم</td><td><span class='pill watch'>تحت نظر</span></td><td>12.0</td><td>—</td><td>—</td><td>—</td></tr></tbody></table></section>
-</main></body></html>
+        </article></div>
+<section class="panel">
+  <h3>📌 پوزیشن‌های باز</h3>
+  <div class="empty">هیچ پوزیشن باز فعالی نیست.</div>
+</section>
+<div class="footer-bar">
+  <span>📊 6 برد / 3 باخت (نرخ برد 66.7٪)</span>
+  <span>برای جزئیات کامل (زنجیره آپشن، استراتژی‌ها، Greeks): options_dashboard_AHRAM_LIVE4.html</span>
+</div>
+</div>
+</body></html>

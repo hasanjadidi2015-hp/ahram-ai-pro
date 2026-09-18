@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-17 13:27:48",
+  "generated_at": "2026-09-17 14:24:19",
   "mode": "SHADOW_READ_ONLY",
   "signals_modified": false,
   "database_modified": false,
@@ -54,23 +54,23 @@
         },
         {
           "expiry": "1405/07/29",
-          "stock_price": 57167.0,
-          "max_pain_strike": 50000.0,
-          "distance_pct": 12.536953137299491,
+          "stock_price": 74570.0,
+          "max_pain_strike": 56000.0,
+          "distance_pct": 24.902775915247418,
           "data_quality": "HIGH",
-          "contracts_count": 30,
-          "contracts_with_oi": 29,
-          "time": "2026-09-05 12:37:59"
+          "contracts_count": 34,
+          "contracts_with_oi": 34,
+          "time": "2026-09-17 13:27:49"
         },
         {
           "expiry": "1405/08/27",
-          "stock_price": 57167.0,
-          "max_pain_strike": 30000.0,
-          "distance_pct": 47.522171882379695,
+          "stock_price": 74570.0,
+          "max_pain_strike": 50000.0,
+          "distance_pct": 32.948907067185196,
           "data_quality": "HIGH",
           "contracts_count": 22,
-          "contracts_with_oi": 21,
-          "time": "2026-09-05 12:37:59"
+          "contracts_with_oi": 22,
+          "time": "2026-09-17 13:27:49"
         }
       ],
       "best_covered_call": {
@@ -185,23 +185,33 @@
         },
         {
           "expiry": "1405/07/22",
-          "stock_price": 1483.0,
-          "max_pain_strike": 1054.0,
-          "distance_pct": 28.927848954821307,
+          "stock_price": 1592.0,
+          "max_pain_strike": 1254.0,
+          "distance_pct": 21.231155778894472,
           "data_quality": "HIGH",
           "contracts_count": 26,
-          "contracts_with_oi": 23,
-          "time": "2026-09-05 12:37:59"
+          "contracts_with_oi": 26,
+          "time": "2026-09-17 13:27:49"
         },
         {
           "expiry": "1405/08/20",
-          "stock_price": 1483.0,
+          "stock_price": 1592.0,
           "max_pain_strike": 800.0,
-          "distance_pct": 46.05529332434255,
+          "distance_pct": 49.74874371859296,
           "data_quality": "HIGH",
           "contracts_count": 26,
-          "contracts_with_oi": 19,
-          "time": "2026-09-05 12:37:59"
+          "contracts_with_oi": 23,
+          "time": "2026-09-17 13:27:49"
+        },
+        {
+          "expiry": "1405/09/18",
+          "stock_price": 1592.0,
+          "max_pain_strike": 1000.0,
+          "distance_pct": 37.185929648241206,
+          "data_quality": "HIGH",
+          "contracts_count": 26,
+          "contracts_with_oi": 15,
+          "time": "2026-09-17 13:27:49"
         }
       ],
       "best_covered_call": {
@@ -316,33 +326,33 @@
         },
         {
           "expiry": "1405/07/15",
-          "stock_price": 2932.0,
-          "max_pain_strike": 2800.0,
-          "distance_pct": 4.502046384720328,
+          "stock_price": 3700.0,
+          "max_pain_strike": 3000.0,
+          "distance_pct": 18.91891891891892,
           "data_quality": "HIGH",
-          "contracts_count": 26,
-          "contracts_with_oi": 24,
-          "time": "2026-09-05 12:37:59"
+          "contracts_count": 30,
+          "contracts_with_oi": 29,
+          "time": "2026-09-17 13:27:49"
         },
         {
           "expiry": "1405/08/13",
-          "stock_price": 2932.0,
-          "max_pain_strike": 1600.0,
-          "distance_pct": 45.429740791268756,
+          "stock_price": 3700.0,
+          "max_pain_strike": 2600.0,
+          "distance_pct": 29.72972972972973,
           "data_quality": "HIGH",
           "contracts_count": 26,
-          "contracts_with_oi": 17,
-          "time": "2026-09-05 12:37:59"
+          "contracts_with_oi": 20,
+          "time": "2026-09-17 13:27:49"
         },
         {
           "expiry": "1405/09/11",
-          "stock_price": 2932.0,
+          "stock_price": 3700.0,
           "max_pain_strike": 1900.0,
-          "distance_pct": 35.19781718963165,
-          "data_quality": "MEDIUM",
+          "distance_pct": 48.64864864864865,
+          "data_quality": "HIGH",
           "contracts_count": 24,
-          "contracts_with_oi": 7,
-          "time": "2026-09-05 12:37:59"
+          "contracts_with_oi": 13,
+          "time": "2026-09-17 13:27:49"
         }
       ],
       "best_covered_call": {

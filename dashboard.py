@@ -419,155 +419,174 @@ def _order_label(info):
 
 def generate():
     cards = [_symbol_info(name, db) for name, db in SYMBOL_DBS]
-    max_pain_data = [(name, _latest_max_pain(db)) for name, db in SYMBOL_DBS]
     positions = _open_positions()
-    signals = _all_signals()
-    news = _recent_news()
     wins, losses, pending, total, wr = _ai_stats()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    active = [c for c in cards if _sig_meta(c["signal"]["type"])[0] in ("buy", "sell")]
-    best = max(active, key=lambda c: float(c["signal"]["score"] or 0), default=None)
-    top_cls, top_text = _sig_meta(best["signal"]["type"] if best else "WATCH")
+    def score_color(cls):
+        return {"buy": "var(--good)", "sell": "var(--bad)", "watch": "var(--accent)"}.get(cls, "var(--muted)")
 
     card_html = ""
     for info in cards:
         sig_cls, sig_text = _sig_meta(info["signal"]["type"])
         order_text, order_cls = _order_label(info)
-        option = _esc(info["signal"].get("option"))
-        gamma = "—"
-        if info["gamma_wall"]:
-            regime = {"CALL_HEAVY": "کال‌سنگین", "PUT_HEAVY": "پوت‌سنگین", "BALANCED": "متعادل"}.get(info["gamma_regime"], info["gamma_regime"])
-            gamma = f"دیواره {_fmt(info['gamma_wall'])} · {regime}"
-        score = info["signal"].get("score")
-        score_text = f"{int(float(score))}/100" if score is not None else "—"
-        v2_score = info["signal"].get("v2_score")
-        v2_score_text = f"{int(float(v2_score))}/100" if v2_score is not None else "—"
-        v2_dec = info["signal"].get("v2_decision") or "—"
-        v2_best = info["signal"].get("v2_best") or "—"
-        option_info = "بدون قرارداد منتخب"
-        if info["signal"].get("option"):
-            option_info = f"{option} · اعمال {_fmt(info['signal'].get('strike'))} · {info['option_days'] if info['option_days'] is not None else '—'} روز"
-        ag = info.get("advanced_greeks") or {}
-        ag_text = "Greeks پیشرفته: در انتظار داده"
-        ag_cls = "muted"
-        if ag.get("available"):
-            ag_level = ag.get("risk_level", "UNKNOWN")
-            ag_text = f"Greeks پیشرفته: ریسک {ag_level}"
-            ag_cls = "sell" if ag_level == "HIGH" else ("watch" if ag_level == "MEDIUM" else "buy")
-        
-        # V2 details breakdown
-        v2_details = info.get("v2_details") or {}
-        v2_breakdown_html = ""
-        if isinstance(v2_details, dict):
-            best_c = v2_details.get("best_contract") or {}
-            if best_c:
-                breakdown = best_c.get("breakdown", []) if isinstance(best_c, dict) else []
-                risks = v2_details.get("risks", []) if isinstance(v2_details, dict) else []
-                if breakdown:
-                    v2_breakdown_html = "<div class='v2-breakdown'>"
-                    v2_breakdown_html += "<b>🔬 V2 Breakdown:</b><br>"
-                    for b in breakdown[:6]:
-                        v2_breakdown_html += f"<span class='v2-item'>• { _esc(b) }</span><br>"
-                    if risks:
-                        v2_breakdown_html += "<b>⚠️ RISK:</b><br>"
-                        for r in risks[:3]:
-                            v2_breakdown_html += f"<span class='v2-risk'>• { _esc(r) }</span><br>"
-                    v2_breakdown_html += "</div>"
+        score = float(info["signal"]["score"] or 0)
+        score_pct = max(0, min(100, abs(score) if score <= 100 else 100))
+        price = f"{info['price']:,.0f}" if info["price"] else "—"
 
-        card_html += f'''<article class="symbol-card {sig_cls}">
-          <div class="card-head"><h3>{_esc(info['name'])}</h3><span class="pill {sig_cls}">{sig_text}</span></div>
-          <div class="price">{_fmt(info['price'])}<small>ریال</small></div>
-          <div class="score"><span>امتیاز قدیمی</span><b>{score_text}</b></div>
-          <div class="meter"><i class="{sig_cls}" style="width:{min(100, max(0, float(score or 0)))}%"></i></div>
-          <div class="score v2"><span>🔬 CALL SCORE V2</span><b>{v2_score_text}</b> <small>{_esc(v2_dec)} · {_esc(v2_best)}</small></div>
-          <div class="meter v2"><i class="buy" style="width:{min(100, max(0, float(v2_score or 0)))}%"></i></div>
-          <div class="contract">{option_info}</div>
-          {v2_breakdown_html}
-          <div class="chips"><span class="chip {order_cls}">{order_text}</span><span class="chip muted">γ {gamma}</span><span class="chip {ag_cls}">{ag_text}</span></div>
+        chips = f'<span class="chip {order_cls}">{_esc(order_text)}</span>'
+        if info["gamma_wall"]:
+            regime = {"CALL_HEAVY": "کال‌سنگین", "PUT_HEAVY": "پوت‌سنگین", "BALANCED": "متعادل"}.get(info["gamma_regime"], info["gamma_regime"] or "")
+            chips += f'<span class="chip muted">🧲 دیواره {info["gamma_wall"]:,.0f} ({_esc(regime)})</span>'
+        if info["news_count"]:
+            chips += f'<span class="chip muted">📰 {info["news_count"]} خبر امروز</span>'
+
+        contract_html = ""
+        opt = info["signal"].get("option")
+        if sig_cls in ("buy", "sell") and opt:
+            details = info["signal"].get("details")
+            sl = t1 = t2 = None
+            try:
+                parsed = json.loads(details) if details else {}
+                sl = parsed.get("stop_loss") or (parsed.get("option") or {}).get("stop_loss")
+                t1 = parsed.get("target1") or (parsed.get("option") or {}).get("target1")
+                t2 = parsed.get("target2") or (parsed.get("option") or {}).get("target2")
+            except Exception:
+                pass
+            rows = []
+            if sl: rows.append(f'<span class="mini bad">SL {sl:,.0f}</span>')
+            if t1: rows.append(f'<span class="mini good">TP۱ {t1:,.0f}</span>')
+            if t2: rows.append(f'<span class="mini good">TP۲ {t2:,.0f}</span>')
+            contract_html = f'''
+            <div class="contract">
+              <div class="contract-head">🎯 {_esc(opt)}</div>
+              <div class="contract-targets">{"".join(rows)}</div>
+            </div>'''
+
+        card_html += f'''
+        <article class="card {sig_cls}">
+          <div class="card-top">
+            <h2>{_esc(info["name"])}</h2>
+            <div class="price">{price}<span class="unit"> ریال</span></div>
+          </div>
+          <div class="signal-row">
+            <span class="badge {sig_cls}">{_esc(sig_text)}</span>
+            <span class="score-num">{score:.0f}</span>
+          </div>
+          <div class="score-bar"><div class="score-fill" style="width:{score_pct}%;background:{score_color(sig_cls)}"></div></div>
+          <div class="chips">{chips}</div>
+          {contract_html}
         </article>'''
 
-    position_html = ""
-    for p in positions:
-        cls = "buy" if p["pct"] >= 0 else "sell"
-        state_txt = "هدف اول" if p["outcome"] == "T1_HIT" else "باز"
-        progress = min(100, max(0, (p["pct"] + 12) / 27 * 100))
-        v2_info = ""
-        if p.get("v2_score") is not None:
-            v2_info = f" · V2 {int(float(p['v2_score']))}/100 { _esc(p.get('v2_best') or '')}"
-        position_html += f'''<div class="position-card">
-          <div class="position-main"><div><span class="eyebrow">{_esc(p['stock'])} · {_esc(p['symbol'])}{v2_info}</span><strong class="{cls}">{_pct(p['pct'])}</strong></div><span class="pill info">{state_txt}</span></div>
-          <div class="track"><i style="width:{progress:.1f}%"></i><span class="entry">ورود</span><span class="t1">هدف ۱</span></div>
-          <div class="position-data"><span>ورود <b>{_fmt(p['entry'])}</b></span><span>فعلی <b>{_fmt(p['current'])}</b></span><span>حدضرر <b>{_fmt(p['stop'])}</b></span><span>هدف ۱ <b>{_fmt(p['t1'])}</b></span><span>هدف ۲ <b>{_fmt(p['t2'])}</b></span></div>
-        </div>'''
-    if not position_html:
-        position_html = '<div class="empty-state">پوزیشن بازی وجود ندارد.</div>'
+    pos_rows = ""
+    if positions:
+        for p in positions:
+            pct = p.get("pct")
+            pct_cls = "good" if (pct or 0) >= 0 else "bad"
+            pct_txt = f"{pct:+.1f}٪" if pct is not None else "—"
+            outcome_txt = {"PENDING": "باز", "T1_HIT": "نیم‌فروخته"}.get(p.get("outcome"), p.get("outcome") or "")
+            pos_rows += f'''
+            <div class="pos-row">
+              <span class="pos-stock">{_esc(p["stock"])}</span>
+              <span class="pos-sym">{_esc(p["symbol"])}</span>
+              <span class="pos-entry">ورود {p["entry"]:,.0f}</span>
+              <span class="pos-current">فعلی {p["current"]:,.0f}</span>
+              <span class="pos-pct {pct_cls}">{pct_txt}</span>
+              <span class="pos-status">{_esc(outcome_txt)}</span>
+            </div>'''
+    else:
+        pos_rows = '<div class="empty">هیچ پوزیشن باز فعالی نیست.</div>'
 
-    alert_items = []
-    for info in cards:
-        order_text, order_cls = _order_label(info)
-        if order_cls in ("buy", "sell"):
-            alert_items.append((order_cls, info["name"], order_text))
-        latest = info.get("latest_news")
-        if latest and latest.get("category") in ("توقف نماد", "عدم تأیید معاملات", "افشای اطلاعات بااهمیت"):
-            alert_items.append(("watch", info["name"], f"خبر: {_esc(latest.get('category'))}"))
-    alerts_html = "".join(f'<div class="alert {c}"><b>{_esc(n)}</b><span>{t}</span></div>' for c, n, t in alert_items[:6])
-    if not alerts_html:
-        alerts_html = '<div class="empty-state">هشدار فعال مهمی ثبت نشده است.</div>'
+    wr_txt = f"{wins} برد / {losses} باخت (نرخ برد {wr}٪)" if (wins or losses) else "هنوز معامله‌ای تسویه نشده"
 
-    news_html = ""
-    for t, name, source, title, cat, event_date in news:
-        news_html += f'''<div class="news-row"><span class="news-time">{_esc(event_date or t)}</span><span class="news-name">{_esc(name)}</span><span class="news-cat">{_esc(cat or source)}</span><span>{_esc(title)}</span></div>'''
-    if not news_html:
-        news_html = '<div class="empty-state">خبر رسمی ثبت‌شده‌ای وجود ندارد.</div>'
-
-    hist_html = ""
-    for row in signals:
-        if len(row) >= 9:
-            t, name, st, score, option, outcome, out_pct, v2_score, v2_dec = row[:9]
-        else:
-            t, name, st, score, option, outcome, out_pct = row[:7]
-            v2_score = v2_dec = None
-        cls, label = _sig_meta(st)
-        result = "—"
-        if outcome == "WIN": result = f'<span class="buy">برد {_pct(out_pct)}</span>'
-        elif outcome == "LOSS": result = f'<span class="sell">باخت {_pct(out_pct)}</span>'
-        elif outcome == "T1_HIT": result = '<span class="watch">هدف اول</span>'
-        elif outcome == "PENDING" and option: result = '<span class="info-text">باز</span>'
-        v2_txt = f"{int(float(v2_score))} ({_esc(v2_dec)})" if v2_score is not None else "—"
-        hist_html += f"<tr><td>{_esc((t or '')[11:16])}</td><td>{_esc(name)}</td><td><span class='pill {cls}'>{label}</span></td><td>{score if score is not None else '—'}</td><td>{v2_txt}</td><td>{_esc(option)}</td><td>{result}</td></tr>"
-    if not hist_html:
-        hist_html = '<tr><td colspan="7" class="empty-state">سیگنالی ثبت نشده است.</td></tr>'
-
-    max_pain_html = ""
-    for name, rows in max_pain_data:
-        if not rows:
-            max_pain_html += f'<div class="maxpain-card"><h3>{_esc(name)}</h3><div class="empty-state">هنوز داده Max Pain ثبت نشده است.</div></div>'
-            continue
-        items = ""
-        for expiry, stock_price, strike, distance, quality in rows:
-            distance_text = _pct(distance)
-            items += f'''<div class="maxpain-row"><span>{_esc(expiry)}</span><b>{_fmt(strike)}</b><span>فاصله {distance_text}</span><em>{_esc(quality)}</em></div>'''
-        max_pain_html += f'<div class="maxpain-card"><h3>{_esc(name)}</h3>{items}</div>'
-
-    best_detail = "فعلاً شرایط ورود تازه تأیید نشده است."
-    if best:
-        s = best["signal"]
-        best_detail = f"{_esc(best['name'])} · قرارداد {_esc(s.get('option'))} · ورود {_fmt(s.get('option_price'))} · حدضرر {_fmt(s.get('stop'))} · هدف اول {_fmt(s.get('t1'))} · V2 Score {s.get('v2_score') or '—'}"
-
-    html_doc = f'''<!doctype html>
-<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="{REFRESH_SECONDS}"><title>AHRAM AI PRO</title>
+    html_doc = f'''<!DOCTYPE html>
+<html lang="fa" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="{REFRESH_SECONDS}">
+<title>AHRAM AI PRO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{{--bg:#0b1220;--panel:#111c2e;--panel2:#17263d;--line:#263750;--text:#edf3ff;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--blue:#38bdf8;--purple:#a78bfa}}*{{box-sizing:border-box}}body{{margin:0;background:linear-gradient(145deg,#09111e,#0b1220 48%,#101827);color:var(--text);font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-size:14px}}.shell{{max-width:1440px;margin:auto;padding:22px}}.top{{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:18px}}h1{{font-size:22px;margin:0}}.sub,.muted{{color:var(--muted)}}.status{{display:flex;gap:8px;flex-wrap:wrap}}.status span,.chip,.pill{{border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;white-space:nowrap}}.status span{{background:#152238;color:#cbd5e1}}.live{{color:#86efac!important}}.live:before{{content:'●';margin-left:5px}}.hero{{margin:18px 0;display:grid;grid-template-columns:1.1fr 2fr;gap:14px}}.hero-main,.hero-detail,.symbol-card,.panel,.position-card{{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px}}.hero-main{{padding:18px;border-right:5px solid var(--green)}}.hero-main.sell{{border-color:var(--red)}}.hero-main.watch,.hero-main.muted{{border-color:var(--orange)}}.hero-label,.eyebrow{{color:var(--muted);font-size:12px}}.hero-action{{font-size:28px;font-weight:900;margin-top:7px}}.hero-detail{{padding:18px;display:flex;align-items:center;color:#d8e3f4}}.symbol-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}}.symbol-card{{padding:16px;min-width:0}}.symbol-card.buy{{border-top:3px solid var(--green)}}.symbol-card.sell{{border-top:3px solid var(--red)}}.symbol-card.watch,.symbol-card.muted{{border-top:3px solid var(--orange}}}}.card-head,.position-main{{display:flex;justify-content:space-between;align-items:center;gap:8px}}h3{{margin:0;font-size:17px}}.price{{font-size:29px;font-weight:900;margin:15px 0 10px}}.price small{{font-size:11px;color:var(--muted);margin-right:5px}}.score{{display:flex;justify-content:space-between;color:var(--muted)}}.score.v2{{color:var(--purple);margin-top:6px}}.score b{{color:var(--text)}}.score.v2 b{{color:var(--purple)}}.meter,.track{{height:7px;background:#223049;border-radius:9px;overflow:hidden;margin:8px 0 13px}}.meter.v2{{height:5px}}.meter i,.track i{{display:block;height:100%;background:var(--blue);border-radius:9px}}.meter i.buy{{background:var(--green)}}.meter i.sell{{background:var(--red)}}.meter i.watch,.meter i.muted{{background:var(--orange)}}.contract{{font-size:12px;border-top:1px solid var(--line);padding-top:11px;color:#d5dfef;min-height:38px}}.v2-breakdown{{font-size:11px;background:#0d1829;border:1px dashed #2a3a5a;border-radius:8px;padding:8px;margin:8px 0;color:#cbd5e1}}.v2-item{{color:#a5b4fc}}.v2-risk{{color:#fca5a5}}.chips{{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}}.pill.buy,.chip.buy{{background:#123c29;color:#86efac}}.pill.sell,.chip.sell{{background:#4a1c25;color:#fca5a5}}.pill.watch,.chip.watch{{background:#4a3512;color:#fcd34d}}.pill.muted,.chip.muted{{background:#243147;color:#b6c4d8}}.pill.info{{background:#163a56;color:#7dd3fc}}.grid2{{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:18px}}.panel{{padding:16px}}.panel h2{{font-size:15px;margin:0 0 13px}}.position-card{{padding:14px;margin-bottom:10px;background:#0d1829}}.position-card strong{{font-size:21px;display:block;margin-top:4px}}.buy{{color:#86efac}}.sell{{color:#fca5a5}}.watch{{color:#fcd34d}}.track{{position:relative;margin:13px 0 17px}}.track i{{background:linear-gradient(90deg,var(--red),var(--blue),var(--green))}}.track span{{position:absolute;top:11px;color:var(--muted);font-size:10px}}.track .entry{{right:42%}}.track .t1{{left:0}}.position-data{{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;font-size:11px;color:var(--muted)}}.position-data b{{display:block;color:var(--text);font-size:13px;margin-top:3px}}.alert{{display:flex;gap:9px;padding:10px;border-bottom:1px solid var(--line)}}.alert:last-child{{border:0}}.alert b{{min-width:45px}}.alert.buy{{border-right:3px solid var(--green)}}.alert.sell{{border-right:3px solid var(--red)}}.alert.watch{{border-right:3px solid var(--orange)}}.news-row{{display:grid;grid-template-columns:92px 55px 105px 1fr;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}}.news-time,.news-cat{{color:var(--muted)}}.news-name{{font-weight:bold}}.maxpain-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}}.maxpain-card{{background:#0d1829;border:1px solid var(--line);border-radius:12px;padding:12px}}.maxpain-card h3{{margin-bottom:8px}}.maxpain-row{{display:grid;grid-template-columns:1fr .8fr 1.2fr auto;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:11px}}.maxpain-row:last-child{{border-bottom:0}}.maxpain-row b{{color:var(--text)}}.maxpain-row em{{font-style:normal;color:#86efac;font-size:10px}}.stats{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}}.stat{{background:var(--panel);border:1px solid var(--line);padding:14px;border-radius:13px}}.stat span{{color:var(--muted);font-size:12px}}.stat b{{font-size:23px;display:block;margin-top:5px}}table{{width:100%;border-collapse:collapse}}th,td{{padding:10px;border-bottom:1px solid var(--line);text-align:right;font-size:12px}}th{{color:var(--muted);font-weight:600}}.history{{margin-top:18px}}.empty-state{{color:var(--muted);padding:18px;text-align:center}}.info-text{{color:#7dd3fc}}@media(max-width:850px){{.hero,.grid2{{grid-template-columns:1fr}}.symbol-grid{{grid-template-columns:1fr}}.maxpain-grid{{grid-template-columns:1fr}}.top{{align-items:flex-start;flex-direction:column}}.position-data{{grid-template-columns:repeat(3,1fr)}}.news-row{{grid-template-columns:75px 45px 1fr}}.news-row span:last-child{{grid-column:1/-1}}.hide-mobile{{display:none}}.stats{{grid-template-columns:repeat(2,1fr)}}}}
-</style></head><body><main class="shell">
-<header class="top"><div><h1>🚀 AHRAM AI PRO - Option Decision System</h1><div class="sub">داشبورد با CALL SCORE + Breakdown + RISK · فقط نمایش داده‌های فعلی ربات</div></div><div class="status"><span class="live">سیستم فعال</span><span>به‌روزرسانی {REFRESH_SECONDS} ثانیه</span><span>{now}</span></div></header>
-<section class="hero"><div class="hero-main {top_cls}"><div class="hero-label">بهترین اقدام فعلی (قدیمی)</div><div class="hero-action">{top_text}</div></div><div class="hero-detail">{best_detail}</div></section>
-<section class="symbol-grid">{card_html}</section>
-<section class="panel" style="margin-top:18px"><h2>📍 Max Pain اکتشافی <span class="sub">(صرفاً اطلاعاتی)</span></h2><div class="maxpain-grid">{max_pain_html}</div></section>
-<section class="grid2"><div class="panel"><h2>📌 پوزیشن‌های باز</h2>{position_html}</div><div class="panel"><h2>⚠️ هشدارها و وضعیت تابلو</h2>{alerts_html}</div></section>
-<section class="grid2"><div class="panel"><h2>📰 آخرین رویدادهای رسمی</h2>{news_html}</div><div class="panel"><h2>🧠 وضعیت یادگیری</h2><div class="stats"><div class="stat"><span>کل رکوردها</span><b>{total}</b></div><div class="stat"><span>برد / باخت</span><b>{wins} / {losses}</b></div><div class="stat"><span>نرخ برد</span><b>{wr}٪</b></div><div class="stat"><span>پوزیشن باز</span><b>{pending}</b></div></div><div class="sub" style="margin-top:12px;font-size:11px">V5: ستون V2 Score برای بک‌تست سیستم جدید.</div></div></section>
-<section class="panel history"><h2>📜 آخرین تصمیم‌ها <span class="sub">(۱۲ رکورد آخر - قدیمی + V2)</span></h2><table><thead><tr><th>زمان</th><th>نماد</th><th>تصمیم قدیمی</th><th>امتیاز قدیمی</th><th>V2 Score</th><th class="hide-mobile">قرارداد</th><th>نتیجه</th></tr></thead><tbody>{hist_html}</tbody></table></section>
-</main></body></html>'''
+:root{{
+  --bg:#0E1013; --surface:#171A1F; --surface-2:#1D2128;
+  --accent:#C99A3E; --good:#4CAE8C; --bad:#D66A5C; --muted:#7D8590;
+  --text:#EDEBE6; --text-dim:#9BA1AC; --border:#2A2D33;
+}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--bg);color:var(--text);font-family:'Vazirmatn',Tahoma,sans-serif;
+  font-feature-settings:'tnum' 1;line-height:1.6;padding:28px 20px 60px}}
+.wrap{{max-width:1180px;margin:0 auto}}
+header{{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;
+  margin-bottom:26px;padding-bottom:16px;border-bottom:1px solid var(--border)}}
+header h1{{font-size:22px;font-weight:700;margin:0;letter-spacing:.2px}}
+header .meta{{color:var(--text-dim);font-size:13px}}
+.cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:28px}}
+.card{{background:var(--surface);border:1px solid var(--border);border-right:4px solid var(--muted);
+  border-radius:10px;padding:18px 20px}}
+.card.buy{{border-right-color:var(--good)}}
+.card.sell{{border-right-color:var(--bad)}}
+.card.watch{{border-right-color:var(--accent)}}
+.card-top{{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}}
+.card-top h2{{font-size:17px;font-weight:600;margin:0;color:var(--text)}}
+.price{{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}}
+.price .unit{{font-size:12px;font-weight:400;color:var(--text-dim)}}
+.signal-row{{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}}
+.badge{{display:inline-block;padding:5px 14px;border-radius:999px;font-size:13px;font-weight:600}}
+.badge.buy{{background:rgba(76,174,140,.15);color:var(--good)}}
+.badge.sell{{background:rgba(214,106,92,.15);color:var(--bad)}}
+.badge.watch{{background:rgba(201,154,62,.15);color:var(--accent)}}
+.badge.muted{{background:rgba(125,133,144,.15);color:var(--muted)}}
+.score-num{{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-dim)}}
+.score-bar{{height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-bottom:14px}}
+.score-fill{{height:100%;border-radius:99px}}
+.chips{{display:flex;flex-wrap:wrap;gap:6px}}
+.chip{{font-size:12px;padding:4px 10px;border-radius:7px;background:var(--surface-2);color:var(--text-dim)}}
+.chip.buy{{color:var(--good)}}
+.chip.sell{{color:var(--bad)}}
+.contract{{margin-top:14px;padding:12px 14px;background:var(--surface-2);border-radius:8px}}
+.contract-head{{font-size:14px;font-weight:600;margin-bottom:6px}}
+.contract-targets{{display:flex;gap:8px;flex-wrap:wrap}}
+.mini{{font-size:12px;padding:3px 9px;border-radius:6px;font-weight:600;font-variant-numeric:tabular-nums}}
+.mini.good{{background:rgba(76,174,140,.15);color:var(--good)}}
+.mini.bad{{background:rgba(214,106,92,.15);color:var(--bad)}}
+section.panel{{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:18px 20px;margin-bottom:16px}}
+section.panel h3{{font-size:15px;font-weight:600;margin:0 0 14px}}
+.pos-row{{display:grid;grid-template-columns:70px 100px 1fr 1fr 80px 90px;gap:10px;align-items:center;
+  padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}}
+.pos-row:last-child{{border-bottom:none}}
+.pos-stock{{font-weight:600}}
+.pos-sym{{color:var(--text-dim);font-variant-numeric:tabular-nums}}
+.pos-entry,.pos-current{{color:var(--text-dim);font-variant-numeric:tabular-nums}}
+.pos-pct{{font-weight:700;font-variant-numeric:tabular-nums}}
+.pos-pct.good{{color:var(--good)}}
+.pos-pct.bad{{color:var(--bad)}}
+.pos-status{{color:var(--text-dim);font-size:12px}}
+.empty{{color:var(--text-dim);font-size:13px}}
+.footer-bar{{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--text-dim);font-size:12px;
+  padding-top:10px}}
+@media(max-width:640px){{
+  .pos-row{{grid-template-columns:1fr 1fr;row-gap:4px}}
+}}
+</style>
+</head><body>
+<div class="wrap">
+<header>
+  <h1>AHRAM AI PRO</h1>
+  <span class="meta">به‌روزرسانی خودکار هر {REFRESH_SECONDS} ثانیه · آخرین بروزرسانی {now}</span>
+</header>
+<div class="cards">{card_html}</div>
+<section class="panel">
+  <h3>📌 پوزیشن‌های باز</h3>
+  {pos_rows}
+</section>
+<div class="footer-bar">
+  <span>📊 {wr_txt}</span>
+  <span>برای جزئیات کامل (زنجیره آپشن، استراتژی‌ها، Greeks): options_dashboard_AHRAM_LIVE4.html</span>
+</div>
+</div>
+</body></html>'''
     try:
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
             f.write(html_doc)
@@ -575,7 +594,7 @@ def generate():
             f.write(html_doc)
         return OUTPUT_FILE
     except Exception as e:
-        print("[DASHBOARD V5] ERROR:", e)
+        print("[DASHBOARD] ERROR:", e)
         return None
 
 if __name__ == "__main__":
