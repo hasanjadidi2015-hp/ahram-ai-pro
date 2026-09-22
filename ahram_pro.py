@@ -893,12 +893,13 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     vol_data = options_analysis.get("volume_analysis")
     if vol_data:
         vol_final = vol_data.get("volume", "NEUTRAL")
+        is_bearish_setup = technicals["action"] in ("SELL", "STRONG SELL")
         if vol_final == "BUY":
-            checks["volume_ok"] = True
-            reasons.append(f"✅ حجم: صعودی")
+            checks["volume_ok"] = not is_bearish_setup
+            reasons.append(f"✅ حجم: صعودی" if not is_bearish_setup else f"❌ حجم: صعودی (خلاف جهت نزولی)")
         elif vol_final == "SELL":
-            checks["volume_ok"] = False
-            reasons.append(f"❌ حجم: نزولی")
+            checks["volume_ok"] = is_bearish_setup
+            reasons.append(f"✅ حجم: نزولی" if is_bearish_setup else f"❌ حجم: نزولی")
         else:
             checks["volume_ok"] = False
             reasons.append(f"⚠️ حجم: خنثی")
@@ -936,7 +937,13 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     passed_checks = sum(1 for v in checks.values() if v)
     total_checks = len(checks)
     check_score = (passed_checks / total_checks) * 100
-    final_score = (score * 0.6) + (check_score * 0.4)
+    # قبلاً اینجا از score خام (که برای نزولی منفیه) استفاده می‌شد، یعنی
+    # final_score هیچ‌وقت برای یه روند نزولی قوی از آستانه‌ی min_score رد
+    # نمی‌شد (even -70 با همه‌ی چک‌های پاس‌شده به -2 می‌رسید) -- یعنی
+    # BUY_PUT عملاً از نظر ریاضی غیرممکن بود. جهت (خرید/فروش) از قبل با
+    # technicals["action"] مشخص می‌شه؛ اینجا فقط "چقدر مطمئنیم" لازمه، نه
+    # علامت. برای همین از قدر مطلق امتیاز تکنیکال استفاده می‌کنیم.
+    final_score = (abs(score) * 0.6) + (check_score * 0.4)
 
     ml_reason = None
     if _HAS_ML and option:
@@ -966,7 +973,10 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
             )
         signal_type = "WATCH"
 
-    display_score = max(0, round(final_score))
+    # final_score دیگه هیچ‌وقت منفی نمی‌شه (چون از abs(score) میاد)، پس
+    # دیگه نیازی به max(0,...) نیست -- قبلاً این کلیپ باعث می‌شد امتیاز
+    # واقعی یه روند نزولی (که تو فرمول قدیم منفی بود) تو گزارش صفر دیده بشه.
+    display_score = round(final_score)
 
     signal = {
         "type": signal_type,
