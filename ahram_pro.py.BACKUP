@@ -169,7 +169,7 @@ CONFIG = {
     "capital": 100_000_000,
     # V5 در حالت SHADOW - هیچ نوتیفیکیشن واقعی نمی‌فرسته، فقط لاگ
     "telegram_enabled": False,
-    "desktop_enabled": True,
+    "desktop_enabled": False,
     "dashboard_enabled": True,
     "v2_enabled": True,
     "v2_min_score": 45,
@@ -1163,7 +1163,7 @@ def send_notification(signal, symbol_name):
     if CONFIG.get("shadow_mode"):
         if signal["type"] != "WATCH":
             state.log(f"  🔬 [V5 SHADOW] {signal['type']} {symbol_name} - فقط لاگ", "INFO")
-        # return
+        return
     if signal["type"] == "WATCH":
         return
     message = signal.get("message", "")
