@@ -120,8 +120,8 @@ def collect_options():
         try:
             name = f[3].strip()
 
-            # قیمت آپشن: اول f[5] (آخرین معامله)، اگر نبود f[6] (پایانی)
-            option_price = float(f[5]) if f[5] else 0
+            # قیمت آپشن: اول f[7] (آخرین معامله)، اگر نبود f[6] (پایانی)
+            option_price = float(f[7]) if f[7] else 0
             if option_price <= 0:
                 option_price = float(f[6]) if f[6] else 0
             if option_price <= 0:
