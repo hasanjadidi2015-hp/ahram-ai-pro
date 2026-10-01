@@ -993,7 +993,7 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     if signal_type in ("BUY_CALL", "BUY_PUT") and option:
         # VACE data برای targets
         vace_for_targets = technicals.get("vace") if isinstance(technicals, dict) else None
-        targets = _calculate_targets(option, signal_type, vace_data=vace_for_targets, technicals=technicals)
+        targets = _calculate_targets(option, signal_type, vace_data=vace_for_targets, technicals=technicals, sl_floor=(0.12 if symbol_config.get('ins_code','').startswith('179') else 0.10))
         signal["targets"] = targets
         signal["message"] = _format_signal_message(signal, name)
     else:
@@ -1035,7 +1035,7 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
     return signal
 
 
-def _calculate_targets(option, signal_type, vace_data=None, technicals=None):
+def _calculate_targets(option, signal_type, vace_data=None, technicals=None, sl_floor=0.10):
     entry = float(option.get("option_price", 0))
     dte = int(option.get("days_to_expire", 30))
     if entry <= 0:
@@ -1070,6 +1070,9 @@ def _calculate_targets(option, signal_type, vace_data=None, technicals=None):
             sl_pct = 0.12
         else:
             sl_pct = 0.15
+    # SL floor from daily range
+    if sl_pct < sl_floor:
+        sl_pct = sl_floor
 
     # Tiered TP با ATR Factor داینامیک (VACE)
     # تخمین ATR از قیمت آپشن

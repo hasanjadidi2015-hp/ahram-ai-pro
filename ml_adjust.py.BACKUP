@@ -24,24 +24,16 @@ def _model_paths(db_path):
     return f"{base}_ml_model.pkl", f"{base}_ml_last_train.txt"
 
 
-def _num(v, default):
-    """None-safe float with neutral default (missing value, not dropped row)."""
-    try:
-        return float(v) if v is not None else default
-    except (TypeError, ValueError):
-        return default
-
 def _extract_features(option_decision, score):
     """ویژگی‌های عددی که برای پیش‌بینی احتمال برد استفاده می‌شن."""
     try:
-        od = option_decision or {}
         return [
-            _num(od.get("confidence", 50), 50),
-            _num(od.get("delta", 0.5), 0.5),
-            _num(od.get("iv_premium_ratio", 1.0), 1.0),
-            _num(od.get("probability_of_profit", 50), 50),
-            _num(od.get("distance_pct", 0), 0),
-            _num(score, 50),
+            float(option_decision.get("confidence", 50)),
+            float(option_decision.get("delta", 0.5)),
+            float(option_decision.get("iv_premium_ratio", 1.0)),
+            float(option_decision.get("probability_of_profit", 50)),
+            float(option_decision.get("distance_pct", 0)),
+            float(score),
         ]
     except Exception:
         return None
