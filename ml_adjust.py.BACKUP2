@@ -93,8 +93,6 @@ def train_model(db_path):
         y.append(1 if outcome == "WIN" else 0)
 
     if len(X) < MIN_SAMPLES:
-        with open(last_train_file, "w") as f:
-            f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         return {"trained": False, "message": f"داده کافی نیست ({len(X)}/{MIN_SAMPLES})"}
 
     try:

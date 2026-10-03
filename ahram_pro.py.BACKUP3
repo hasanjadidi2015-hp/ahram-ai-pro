@@ -1271,9 +1271,9 @@ def log_signal_to_db(signal, symbol_name, db_name):
         cur.execute("""
             INSERT INTO signal_history 
             (time, symbol, signal_type, composite_score, option_symbol, 
-             option_price, strike_price, stop_loss, target1, target2, outcome, details, position_id,
+             option_price, strike_price, stop_loss, target1, target2, details, position_id,
              v2_score, v2_decision, v2_best_symbol)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             symbol_name,
@@ -1285,7 +1285,6 @@ def log_signal_to_db(signal, symbol_name, db_name):
             targets.get("stop_loss") if targets else None,
             targets.get("target1") if targets else None,
             targets.get("target2") if targets else None,
-            "PENDING",
             json.dumps(signal, ensure_ascii=False, default=str),
             position_id,
             v2_score,
