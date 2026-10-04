@@ -570,29 +570,6 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
                 option.setdefault("strike_price", option.get("strike_price_clean"))
                 option.setdefault("dte", option.get("dte_clean"))
                 option.setdefault("reasons", [])
-                # ===== Phase 2: 3-question risk WARNs (reasons only, zero score effect) =====
-                try:
-                    _p2_be = option.get("break_even")
-                    _p2_tb = option.get("theta_burn_pct")
-                    _p2_ivr = option.get("iv_premium_ratio")
-                    _p2_vol = option.get("volatility_used")
-                    if _p2_be and stock_price:
-                        _p2_need = abs(float(_p2_be) - float(stock_price)) / float(stock_price) * 100.0
-                        _p2_usual = float(_p2_vol) * (5.0 / 365.0) ** 0.5 * 100.0 if _p2_vol else 0.0
-                        if _p2_usual > 0 and (_p2_need > _p2_usual or _p2_need > 4.0):
-                            _p2_w = f"[WARN-BE] need {_p2_need:.1f}% (usual {_p2_usual:.1f}%, rail 4.0%)"
-                            option["reasons"].append(_p2_w)
-                            state.log(f"  {_p2_w}", "WARN")
-                    if _p2_tb is not None and float(_p2_tb) > 2.0:
-                        _p2_w = f"[WARN-THETA] burn {float(_p2_tb):.2f}%/day"
-                        option["reasons"].append(_p2_w)
-                        state.log(f"  {_p2_w}", "WARN")
-                    if _p2_ivr is not None and float(_p2_ivr) > 1.3:
-                        _p2_w = f"[WARN-IVP] premium {float(_p2_ivr):.2f}x fair"
-                        option["reasons"].append(_p2_w)
-                        state.log(f"  {_p2_w}", "WARN")
-                except Exception as _p2_e:
-                    state.log(f"  Phase2 WARN skip: {_p2_e}", "WARN")
                 result["selected"] = option
                 result["advanced_greeks"] = option.get("advanced_greeks")
                 state.log(f"  ✅ آپشن انتخاب شد: {option.get('symbol')} (اسنپ‌شات: {option.get('snapshot_time')})")
@@ -974,9 +951,8 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
             db_path = symbol_config.get("db")
             ml_adj, ml_reason = ml_adjust.get_ml_adjustment(option, final_score, db_path)
             if ml_adj:
-                # SHADOW MODE: record prediction, do NOT touch score (validation phase).
-                reasons.append(f"[ML-SHADOW] {ml_adj:+.0f}: {ml_reason}")
-                state.log(f"  [ML-SHADOW] {ml_adj:+.0f} (no effect): {ml_reason}")
+                final_score = max(0.0, min(100.0, final_score + ml_adj))
+                reasons.append(f"🧠 {ml_reason}")
         except Exception as e:
             state.log(f"  ⚠️ خطا تعدیل ML: {e}", "WARN")
 
