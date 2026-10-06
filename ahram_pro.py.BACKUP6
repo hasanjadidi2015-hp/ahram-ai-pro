@@ -1257,7 +1257,6 @@ def log_signal_to_db(signal, symbol_name, db_name):
             "v2_score": "REAL",
             "v2_decision": "TEXT",
             "v2_best_symbol": "TEXT",
-            "outcome_time": "TEXT",
         }
         for col_name, col_type in required_columns.items():
             if col_name not in columns:
@@ -1378,9 +1377,9 @@ def check_live_exits_for_symbol(name, db):
             if new_outcome and new_outcome != outcome:
                 pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
                 cur.execute(
-                    "UPDATE signal_history SET outcome=?, outcome_pct=?, outcome_time=? "
+                    "UPDATE signal_history SET outcome=?, outcome_pct=? "
                     "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
-                    (new_outcome, pct, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), pos_id),
+                    (new_outcome, pct, pos_id),
                 )
                 alerts.append((sym, new_outcome, pct, cur_price))
         conn.commit()

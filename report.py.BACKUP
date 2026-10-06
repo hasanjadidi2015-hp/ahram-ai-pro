@@ -105,9 +105,9 @@ for name, db in DBS:
         conn = sqlite3.connect(db)
         cur = conn.cursor()
         cur.execute(
-            "SELECT option_symbol, option_price, outcome, outcome_pct, MAX(outcome_time) "
+            "SELECT option_symbol, option_price, outcome, outcome_pct, MAX(time) "
             "FROM signal_history WHERE outcome IN ('WIN','LOSS') AND position_id IS NOT NULL "
-            "AND outcome_time LIKE ? GROUP BY position_id ORDER BY MAX(outcome_time)",
+            "AND time LIKE ? GROUP BY position_id ORDER BY MAX(time)",
             (f"{today}%",),
         )
         rows = cur.fetchall()
