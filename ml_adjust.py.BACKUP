@@ -24,16 +24,24 @@ def _model_paths(db_path):
     return f"{base}_ml_model.pkl", f"{base}_ml_last_train.txt"
 
 
+def _num(v, default):
+    """None-safe float with neutral default (missing value, not dropped row)."""
+    try:
+        return float(v) if v is not None else default
+    except (TypeError, ValueError):
+        return default
+
 def _extract_features(option_decision, score):
     """ویژگی‌های عددی که برای پیش‌بینی احتمال برد استفاده می‌شن."""
     try:
+        od = option_decision or {}
         return [
-            float(option_decision.get("confidence", 50)),
-            float(option_decision.get("delta", 0.5)),
-            float(option_decision.get("iv_premium_ratio", 1.0)),
-            float(option_decision.get("probability_of_profit", 50)),
-            float(option_decision.get("distance_pct", 0)),
-            float(score),
+            _num(od.get("confidence", 50), 50),
+            _num(od.get("delta", 0.5), 0.5),
+            _num(od.get("iv_premium_ratio", 1.0), 1.0),
+            _num(od.get("probability_of_profit", 50), 50),
+            _num(od.get("distance_pct", 0), 0),
+            _num(score, 50),
         ]
     except Exception:
         return None
@@ -85,6 +93,8 @@ def train_model(db_path):
         y.append(1 if outcome == "WIN" else 0)
 
     if len(X) < MIN_SAMPLES:
+        with open(last_train_file, "w") as f:
+            f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         return {"trained": False, "message": f"داده کافی نیست ({len(X)}/{MIN_SAMPLES})"}
 
     try:

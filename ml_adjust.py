@@ -142,7 +142,11 @@ def get_ml_adjustment(option_decision, score, db_path):
     if isinstance(model, dict) and model.get("type") == "baseline":
         p = model["win_rate"]
     else:
-        p = model.predict_proba([feats])[0][1]
+        _proba = model.predict_proba([feats])[0]
+        try:
+            p = float(_proba[list(model.classes_).index(1)])
+        except (ValueError, IndexError):
+            p = 0.0
     if p >= 0.65:
         return 10, f"مدل یادگیری: احتمال برد بالا ({round(p*100)}%)"
     elif p <= 0.35:
