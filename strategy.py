@@ -282,6 +282,12 @@ class Strategy:
         if self.queue_type is not None and rsi_value is not None:
             if rsi_veto:
                 print(f"RSI VETO حتی با صف فعال شد: صف {self.queue_type} ولی RSI={rsi_value} افراطی -> خنثی شد")
+            elif rsi_value >= self.RSI_OVERBOUGHT and score < self.BUY_THRESHOLD:
+                # RSI افراطیه ولی امتیاز به آستانه‌ی خرید نرسیده، پس وتو لازم نیست.
+                # قبلاً این حالت با پیام «افراطی نیست» اشتباه چاپ می‌شد.
+                print(f"RSI VETO: صف {self.queue_type}، RSI={rsi_value} افراطیه ولی امتیاز {score:.1f} < آستانه خرید {self.BUY_THRESHOLD} -> وتو لازم نبود (امتیاز کافی نیست)")
+            elif rsi_value <= self.RSI_OVERSOLD and score > self.SELL_THRESHOLD:
+                print(f"RSI VETO: صف {self.queue_type}، RSI={rsi_value} افراطی فروش ولی امتیاز {score:.1f} > آستانه فروش {self.SELL_THRESHOLD} -> وتو لازم نبود (امتیاز کافی نیست)")
             else:
                 print(f"RSI VETO: صف {self.queue_type} تشخیص داده شد، RSI={rsi_value} افراطی نیست -> مانعی نیست")
 

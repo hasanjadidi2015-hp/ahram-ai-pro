@@ -982,11 +982,55 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
 
     min_checks = 3
 
+    # ===== فیلتر روند برای خرید پوت =====
+    # پوت فقط وقتی سود می‌ده که روند نزولی واقعی و تأییدشده باشه. در رنج یا اصلاح
+    # (بازار بدون روند یا صعودی) خرید پوت باخت می‌ده. پس اینجا تأیید می‌کنیم:
+    #   - EMA: پشته‌ی نزولی (strength زیر 30 یعنی EMA20 < EMA50 و قیمت زیرشون)
+    #   - MACD: مومنتوم نزولی (strength زیر 50)
+    #   - ADX/VACE: روند قوی (is_trending=True)
+    # اگه هر کدوم داده نداشته باشه، تأیید نمی‌شه (نه اینکه فرض کنیم نزولیه).
+    def _uptrend_confirmed(tech):
+        ind = tech.get("indicators", {}) or {}
+        ema_s = (ind.get("ema") or {}).get("strength")
+        macd_s = (ind.get("macd") or {}).get("strength")
+        vace = tech.get("vace") or {}
+        trending = (vace.get("dynamic_adx") or {}).get("is_trending")
+        checks_ok = {
+            "EMA_BULLISH": ema_s is not None and ema_s > 70,
+            "MACD_BULLISH": macd_s is not None and macd_s > 50,
+            "ADX_TRENDING": trending is True,
+        }
+        return all(checks_ok.values()), checks_ok
+
+    def _downtrend_confirmed(tech):
+        ind = tech.get("indicators", {}) or {}
+        ema_s = (ind.get("ema") or {}).get("strength")
+        macd_s = (ind.get("macd") or {}).get("strength")
+        vace = tech.get("vace") or {}
+        trending = (vace.get("dynamic_adx") or {}).get("is_trending")
+        checks_ok = {
+            "EMA_BEARISH": ema_s is not None and ema_s < 30,
+            "MACD_BEARISH": macd_s is not None and macd_s < 50,
+            "ADX_TRENDING": trending is True,
+        }
+        return all(checks_ok.values()), checks_ok
+
     if passed_checks >= min_checks and final_score >= CONFIG["min_score"] and option:
         if technicals["action"] in ("BUY", "STRONG BUY"):
-            signal_type = "BUY_CALL"
+            # کال هم مثل پوت فقط در روند صعودی تأییدشده سود می‌ده؛ در رنج/اصلاح باخت می‌ده
+            confirmed_up, detail_up = _uptrend_confirmed(technicals)
+            if confirmed_up:
+                signal_type = "BUY_CALL"
+            else:
+                signal_type = "WATCH"
+                reasons.append("⛔ کال رد شد: روند صعودی تأیید نشده " + str({k: bool(v) for k, v in detail_up.items()}))
         elif technicals["action"] in ("SELL", "STRONG SELL"):
-            signal_type = "BUY_PUT"
+            confirmed, detail = _downtrend_confirmed(technicals)
+            if confirmed:
+                signal_type = "BUY_PUT"
+            else:
+                signal_type = "WATCH"
+                reasons.append("⛔ پوت رد شد: روند نزولی تأیید نشده " + str({k: bool(v) for k, v in detail.items()}))
         else:
             signal_type = "WATCH"
     else:
@@ -1220,6 +1264,28 @@ def send_notification(signal, symbol_name):
 
 
 def log_signal_to_db(signal, symbol_name, db_name):
+    # حالت --test فقط برای بررسی کدهاست؛ سیگنال تستی نباید توی دیتابیس اصلی بنشینه
+    # (چون آمار برد/باخت و آموزش مدل رو آلوده می‌کنه). داده‌ی بازار و
+    # به‌روزرسانی پوزیشن‌های واقعی همچنان انجام می‌شه.
+    if "--test" in sys.argv:
+        state.log(f"  🧪 TEST: سیگنال {symbol_name} در دیتابیس ثبت نشد (حالت تست)", "WARN")
+        return
+    # جلوگیری از تکرار: اگه آخرین سیگنال این نماد همون نوع بوده و کمتر از ۳۰ دقیقه پیش
+    # ثبت شده، دوباره ثبت نمی‌شه (همون تصمیم بود که هر ۵ دقیقه تکرار می‌شد)
+    try:
+        _c = sqlite3.connect(db_name)
+        _last = _c.execute(
+            "SELECT signal_type, time FROM signal_history WHERE symbol=? ORDER BY id DESC LIMIT 1",
+            (symbol_name,),
+        ).fetchone()
+        _c.close()
+        if _last and _last[0] == signal.get("type"):
+            _mins = (datetime.now() - datetime.strptime(str(_last[1])[:19], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60
+            if _mins < 30:
+                state.log(f"  ⏭ {symbol_name}: {signal.get('type')} تکراریه (آخرین بار {int(_mins)} دقیقه پیش) -- ثبت نشد", "INFO")
+                return
+    except Exception as _dup_e:
+        state.log(f"  ⚠️ بررسی تکرار سیگنال ناموفق ({symbol_name}): {_dup_e} -- سیگنال ثبت می‌شه", "WARN")
     try:
         conn = sqlite3.connect(db_name)
         cur = conn.cursor()
@@ -1342,6 +1408,9 @@ def check_live_exits_for_symbol(name, db):
             cur.execute("SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (sym,))
             pr = cur.fetchone()
             if not pr or not pr[0]:
+                # قبلاً اینجا بی‌صدا continue می‌شد: پوزیشن باز بدون حد ضرر و بدون هیچ هشداری
+                # از پایش خارج می‌شد. حالا هر چرخه صریحاً WARN می‌ده تا دیده بشه.
+                state.log(f"  ⚠️ پایش خروج متوقف: قیمت {sym} در جدول options پیدا نشد (position {pos_id}) -- حد ضرر اجرا نمی‌شه", "WARN")
                 continue
             cur_price = float(pr[0])
             sl_f = float(sl) if sl else None
@@ -1367,27 +1436,14 @@ def check_live_exits_for_symbol(name, db):
                             sl_f = entry_f  # آپدیت برای چک بعدی
                 except Exception as _be_e:
                     pass
-
-            # Tiered profit-lock (anti-give-back): ratchet SL up on PENDING + T1_HIT.
-            try:
-                if outcome in ("PENDING", "T1_HIT"):
-                    _lock = None
-                    if pnl_pct >= 25.0:
-                        _lock = entry_f * 1.15
-                    elif pnl_pct >= 15.0:
-                        _lock = entry_f * 1.08
-                    if _lock is not None and (not sl_f or _lock > sl_f) and _lock < cur_price:
-                        cur.execute(
-                            "UPDATE signal_history SET stop_loss=? WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
-                            (_lock, pos_id),
-                        )
-                        state.log(f"  [LOCK] {sym} PnL {pnl_pct:.1f}% -> SL locked {(_lock / entry_f - 1) * 100:+.0f}%", "INFO")
-                        sl_f = _lock
-            except Exception:
-                pass
             
             if sl_f and cur_price <= sl_f:
-                new_outcome = "LOSS" if pnl_pct < 0 else "WIN"
+                # اگه SL با Break-Even به قیمت ورود رسیده باشه، خروج در سر به‌سر
+                # یعنی ضرر نیست؛ قبلاً همین به‌اشتباه LOSS (با ۰٪) ثبت می‌شد.
+                if abs(cur_price - entry_f) / entry_f < 0.001:
+                    new_outcome = "BREAK_EVEN"
+                else:
+                    new_outcome = "LOSS"
             elif t2_f and cur_price >= t2_f:
                 new_outcome = "WIN"
             elif t1_f and cur_price >= t1_f and outcome == "PENDING":

@@ -130,10 +130,16 @@ else:
 # بررسی سلامت سیستم — تلاش برای پیدا کردن باگ/قطعی احتمالی
 print("\n🔍 بررسی سلامت (پیدا کردن مشکل احتمالی):")
 issues_found = 0
+# پنج‌شنبه (3) و جمعه (4) بازار تعطیله؛ گزارش سلامت نباید برای این روزها
+# "سیگنال نداشتن" رو به‌عنوان باگ/قطعی گزارش کنه (همون منطق market_is_open در ahram_pro.py)
+_is_trading_day = datetime.now().weekday() not in (3, 4)
+if not _is_trading_day:
+    print("  ℹ️ امروز تعطیل بازار است (پنج‌شنبه/جمعه) -- نبود سیگنال طبیعی است، بررسی انجام نشد")
+    issues_found = 0
 MARKET_CLOSE = "12:30"
 STALE_TOLERANCE_MIN = 12  # کمتر از این فاصله تا پایان بازار طبیعیه (فاصله‌ی سیکل‌ها ۵ دقیقه‌ست)
 GAP_TOLERANCE_MIN = 15    # شکاف بیشتر از این بین دو سیگنال پشت‌سرهم مشکوکه
-for name, _db in DBS:
+for name, _db in (DBS if _is_trading_day else []):
     if signal_counts.get(name, 0) == 0:
         print(f"  ⚠️ {name}: امروز هیچ سیگنالی ثبت نشده — احتمال قطعی در جمع‌آوری داده یا خطای تحلیل")
         issues_found += 1
