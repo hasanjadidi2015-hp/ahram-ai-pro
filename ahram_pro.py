@@ -1263,15 +1263,16 @@ def send_notification(signal, symbol_name):
             state.log(f"  ❌ خطا دسکتاپ: {e}", "ERROR")
 
 
-def log_signal_to_db(signal, symbol_name, db_name):
+def log_signal_to_db(signal, symbol_name, db_name, features=None):
     # حالت --test فقط برای بررسی کدهاست؛ سیگنال تستی نباید توی دیتابیس اصلی بنشینه
     # (چون آمار برد/باخت و آموزش مدل رو آلوده می‌کنه). داده‌ی بازار و
     # به‌روزرسانی پوزیشن‌های واقعی همچنان انجام می‌شه.
     if "--test" in sys.argv:
         state.log(f"  🧪 TEST: سیگنال {symbol_name} در دیتابیس ثبت نشد (حالت تست)", "WARN")
         return
-    # جلوگیری از تکرار: اگه آخرین سیگنال این نماد همون نوع بوده و کمتر از ۳۰ دقیقه پیش
-    # ثبت شده، دوباره ثبت نمی‌شه (همون تصمیم بود که هر ۵ دقیقه تکرار می‌شد)
+    # جلوگیری از تکرار فقط برای تصمیم‌های واقعی (خرید کال/پوت): اگه همون خرید برای همون
+    # نماد کمتر از ۳۰ دقیقه پیش ثبت شده، دوباره ثبت نمی‌شه. سیگنال‌های "تحت نظر" هر ۵ دقیقه
+    # ثبت میشن تا پایش بازار و هشدار سلامت درست کار کنن.
     try:
         _c = sqlite3.connect(db_name)
         _last = _c.execute(
@@ -1279,7 +1280,7 @@ def log_signal_to_db(signal, symbol_name, db_name):
             (symbol_name,),
         ).fetchone()
         _c.close()
-        if _last and _last[0] == signal.get("type"):
+        if _last and _last[0] == signal.get("type") and signal.get("type") in ("BUY_CALL", "BUY_PUT"):
             _mins = (datetime.now() - datetime.strptime(str(_last[1])[:19], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60
             if _mins < 30:
                 state.log(f"  ⏭ {symbol_name}: {signal.get('type')} تکراریه (آخرین بار {int(_mins)} دقیقه پیش) -- ثبت نشد", "INFO")
@@ -1324,6 +1325,7 @@ def log_signal_to_db(signal, symbol_name, db_name):
             "v2_decision": "TEXT",
             "v2_best_symbol": "TEXT",
             "outcome_time": "TEXT",
+            "features": "TEXT",
         }
         for col_name, col_type in required_columns.items():
             if col_name not in columns:
@@ -1363,8 +1365,8 @@ def log_signal_to_db(signal, symbol_name, db_name):
             INSERT INTO signal_history 
             (time, symbol, signal_type, composite_score, option_symbol, 
              option_price, strike_price, stop_loss, target1, target2, outcome, details, position_id,
-             v2_score, v2_decision, v2_best_symbol)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             v2_score, v2_decision, v2_best_symbol, features)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             symbol_name,
@@ -1382,6 +1384,7 @@ def log_signal_to_db(signal, symbol_name, db_name):
             v2_score,
             v2_decision["decision"] if v2_decision else None,
             v2_best_sym,
+            json.dumps(features, ensure_ascii=False, default=str) if features is not None else None,
         ))
         conn.commit()
         conn.close()
@@ -1438,9 +1441,15 @@ def check_live_exits_for_symbol(name, db):
                     pass
             
             if sl_f and cur_price <= sl_f:
-                # اگه SL با Break-Even به قیمت ورود رسیده باشه، خروج در سر به‌سر
-                # یعنی ضرر نیست؛ قبلاً همین به‌اشتباه LOSS (با ۰٪) ثبت می‌شد.
-                if abs(cur_price - entry_f) / entry_f < 0.001:
+                # خروج روی حد ضرر: بسته به اینکه حد ضرر کجاست، نتیجه فرق می‌کنه.
+                #  - اگه قیمت خروج بالای ورود باشه (حد ضرر دنبال‌شونده بالای ورود رفته): سود است -> WIN
+                #  - اگه برابر ورود باشه (Break-Even): سر به‌سر -> BREAK_EVEN
+                #  - اگه زیر ورود باشه: باخت -> LOSS
+                # قبلاً هر خروج روی حد ضرر LOSS می‌شد، حتی با سود (مثلاً +14.5%).
+                _pnl = (cur_price - entry_f) / entry_f
+                if _pnl > 0.001:
+                    new_outcome = "WIN"
+                elif abs(_pnl) <= 0.001:
                     new_outcome = "BREAK_EVEN"
                 else:
                     new_outcome = "LOSS"
@@ -1524,8 +1533,47 @@ def analyze_symbol(symbol_config):
     technicals = analyze_technicals(symbol_config)
     options_analysis = analyze_options(symbol_config, technicals["action"], technicals["confidence"], technicals["price"])
     signal = generate_multi_layer_signal(symbol_config, technicals, options_analysis, market_data.get("market", {}))
+    # ===== ذخیره‌ی کامل ویژگی‌های همین لحظه (برای ML و بررسی بعدی) =====
+    # هر مقدار که موجود نباشه، صریحاً null ثبت می‌شه (نه حذف بی‌صدا).
+    _now = datetime.now()
+    _sel = (options_analysis or {}).get("selected") or {}
+    features = {
+        "time": _now.strftime("%Y-%m-%d %H:%M:%S"),
+        "weekday": _now.weekday(),
+        "hour": _now.hour,
+        "minute": _now.minute,
+        "stock_price": (market_data or {}).get("stock", {}).get("price") if isinstance(market_data, dict) else None,
+        "technicals": {
+            "action": (technicals or {}).get("action"),
+            "score": (technicals or {}).get("score"),
+            "confidence": (technicals or {}).get("confidence"),
+            "indicators": (technicals or {}).get("indicators"),
+        },
+        "vace": (technicals or {}).get("vace"),
+        "options_context": {
+            k: (options_analysis or {}).get(k)
+            for k in ("wiv", "fog", "tape", "volume_analysis", "gamma", "iv_rank", "put_call", "oi_bias")
+        },
+        "selected_contract": {
+            "symbol": _sel.get("symbol"),
+            "option_type": _sel.get("option_type"),
+            "strike_price": _sel.get("strike_price") or _sel.get("strike_price_clean"),
+            "option_price": _sel.get("option_price"),
+            "dte": _sel.get("dte") or _sel.get("dte_clean") or _sel.get("days_to_expire"),
+            "volume": _sel.get("volume"),
+            "open_interest": _sel.get("open_interest"),
+            "snapshot_time": _sel.get("snapshot_time"),
+        },
+        "signal": {
+            "type": signal.get("type"),
+            "score": signal.get("score"),
+            "v2_score": signal.get("v2_score"),
+            "passed_checks": signal.get("checks_passed"),
+            "total_checks": signal.get("checks_total"),
+        },
+    }
 
-    log_signal_to_db(signal, name, db)
+    log_signal_to_db(signal, name, db, features=features)
 
     if signal["type"] != "WATCH":
         direction = signal["type"]

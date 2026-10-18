@@ -76,6 +76,22 @@ be = grand.get("BREAK_EVEN", [0])[0]
 if w + l:
     out(f"\nنرخ برد فعلی (WIN/(WIN+LOSS)): {round(w/(w+l)*100,1)}٪")
     out(f"نرخ برد اگه T1 هم برد حساب بشه: {round((w+t1)/(w+t1+l)*100,1)}٪")
+
+# امید ریاضی: میانگین سود برنده‌ها و میانگین زیان بازنده‌ها (سر به‌سر و بی‌نتیجه کنار گذاشته می‌شن)
+win_sum = grand.get("WIN", [0, 0.0])[1]
+loss_sum = grand.get("LOSS", [0, 0.0])[1]
+t1_sum = grand.get("T1_HIT", [0, 0.0])[1]
+if (w + t1 + l) > 0:
+    avg_win = (win_sum + t1_sum) / (w + t1) if (w + t1) else 0.0
+    avg_loss = loss_sum / l if l else 0.0
+    p_win = (w + t1) / (w + t1 + l)
+    ev = p_win * avg_win + (1 - p_win) * avg_loss
+    out("\n--- امید ریاضی (هر معامله، درصد) ---")
+    out(f"میانگین سود برنده‌ها: {round(avg_win,2)}٪ | میانگین زیان بازنده‌ها: {round(avg_loss,2)}٪")
+    out(f"امید ریاضی هر معامله: {round(ev,2)}٪  ({'مثبت' if ev > 0 else 'منفی'})")
+    out("توجه: این عدد با تعداد معاملات کم قابل اتکا نیست؛ حداقل ۳۰ معامله در هر نماد لازمه.")
+    out("توجه: معاملات INCONCLUSIVE (داده‌ی قدیمی بی‌برچسب) و PENDING در این محاسبه نیستن.")
+    out("توجه: BREAK_EVEN و LOSS های صفر-درصدی قدیمی (قبل از اصلاح برچسب) ممکنه میانگین زیان را کم‌تر نشون بدن.")
 out("=" * 70)
 
 with open(OUT, "w", encoding="utf-8") as f:
