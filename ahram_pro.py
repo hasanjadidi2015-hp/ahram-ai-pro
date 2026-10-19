@@ -1408,8 +1408,10 @@ def check_live_exits_for_symbol(name, db):
             entry_f = float(entry) if entry else 0
             if entry_f <= 0:
                 continue
-            cur.execute("SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (sym,))
-            pr = cur.fetchone()
+            cur.execute("SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 2", (sym,))
+            _prs = cur.fetchall()
+            pr = _prs[0] if _prs else None
+            prev_price = float(_prs[1][0]) if len(_prs) > 1 and _prs[1][0] else None
             if not pr or not pr[0]:
                 # قبلاً اینجا بی‌صدا continue می‌شد: پوزیشن باز بدون حد ضرر و بدون هیچ هشداری
                 # از پایش خارج می‌شد. حالا هر چرخه صریحاً WARN می‌ده تا دیده بشه.
@@ -1440,6 +1442,11 @@ def check_live_exits_for_symbol(name, db):
                 except Exception as _be_e:
                     pass
             
+            if sl_f and cur_price <= sl_f and (prev_price is None or prev_price > sl_f):
+                # خروج روی حد ضرر فقط با تأیید دو قرائت پشت‌سرهم. قرائت منفرد غیرعادی
+                # (مثل ۲۵۰۰ ریال به‌جای ۶۰۰۰، که باعث زیان ۳۶.۷٪ کاذب شد) نباید پوزیشن را ببندد.
+                state.log(f"  ⚠️ حد ضرر {sym}: قیمت {cur_price} زیر حد {sl_f}، ولی قرائت قبلی {prev_price} تأییدش نمی‌کنه -- منتظر تأیید (پوزیشن باز می‌ماند)", "WARN")
+                cur_price = prev_price if prev_price is not None else cur_price
             if sl_f and cur_price <= sl_f:
                 # خروج روی حد ضرر: بسته به اینکه حد ضرر کجاست، نتیجه فرق می‌کنه.
                 #  - اگه قیمت خروج بالای ورود باشه (حد ضرر دنبال‌شونده بالای ورود رفته): سود است -> WIN
@@ -1499,7 +1506,8 @@ def count_real_open_positions_from_db():
                 total += int(row[0])
             conn.close()
         except Exception as e:
-            # اگر جدول وجود ندارد یا خطا، نادیده بگیر
+            # قبلاً بی‌صدا رد می‌شد؛ حالا خطا دیده میشه (قانون: fallback ساکت ممنوع)
+            state.log(f"  ⚠️ شمارش پوزیشن‌های باز از {db_path} ناموفق بود: {e}", "WARN")
             try:
                 conn.close()
             except:

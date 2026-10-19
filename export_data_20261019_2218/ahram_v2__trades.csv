@@ -1,0 +1,2 @@
+﻿id,entry_time,exit_time,symbol,direction,quantity,entry_price,exit_price,stop_loss,take_profit,status,profit,reason_entry,reason_exit
+2,2026-07-25 17:02:28,2026-08-03 10:17:53,UNKNOWN,BUY,1.0,39061.0,39061.0,0.0,0.0,CLOSED,0.0,CONF=100,MANUAL TEST RESET
