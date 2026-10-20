@@ -3,7 +3,7 @@
 خلاصه‌ی روزانه‌ی رباط در یک فایل JSON کوچک (فقط خواندنی، هیچ داده‌ای تغییر نمی‌کنه).
 
 اجرا (کنار فایل‌های .db پروژه، بعد از بازار):
-    python daily_summary.py              -> خلاصه‌ی امروز
+    python daily_summary.py              -> خلاصه‌ی امروز (اگه قبل از ۶ صبح باشه، روز قبل)
     python daily_summary.py 2026-10-19   -> خلاصه‌ی یک روز مشخص
 
 خروجی: daily_summary_<تاریخ>.json
@@ -118,7 +118,16 @@ def options_count(conn, day):
 
 
 def main():
-    day = sys.argv[1] if len(sys.argv) > 1 else datetime.now().strftime("%Y-%m-%d")
+    if len(sys.argv) > 1:
+        day = sys.argv[1]
+    else:
+        # اگه بین نیمه‌شب تا ۶ صبح اجرا بشه، منظور روز معاملاتی قبلیه (نه روز تقویمی جدید)
+        now = datetime.now()
+        if now.hour < 6:
+            from datetime import timedelta
+            day = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        else:
+            day = now.strftime("%Y-%m-%d")
     result = {"date": day, "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "symbols": {}}
 
     for name, db in SYMBOLS:

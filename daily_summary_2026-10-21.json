@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-21",
+  "generated_at": "2026-10-21 00:19:57",
+  "symbols": {
+    "اهرم": {
+      "prices": {
+        "rows": 0,
+        "valid_price_rows": 0,
+        "open": null,
+        "close": null,
+        "high": null,
+        "low": null,
+        "volume_sum": null,
+        "volume_max_single": null,
+        "first_time": null,
+        "last_time": null,
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 0,
+      "signals": {
+        "counts_by_type": {},
+        "actionable": []
+      },
+      "closed_today": [],
+      "open_positions_now": []
+    },
+    "وبملت": {
+      "prices": {
+        "rows": 0,
+        "valid_price_rows": 0,
+        "open": null,
+        "close": null,
+        "high": null,
+        "low": null,
+        "volume_sum": null,
+        "volume_max_single": null,
+        "first_time": null,
+        "last_time": null,
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 0,
+      "signals": {
+        "counts_by_type": {},
+        "actionable": []
+      },
+      "closed_today": [],
+      "open_positions_now": []
+    },
+    "شستا": {
+      "prices": {
+        "rows": 0,
+        "valid_price_rows": 0,
+        "open": null,
+        "close": null,
+        "high": null,
+        "low": null,
+        "volume_sum": null,
+        "volume_max_single": null,
+        "first_time": null,
+        "last_time": null,
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 0,
+      "signals": {
+        "counts_by_type": {},
+        "actionable": []
+      },
+      "closed_today": [],
+      "open_positions_now": []
+    }
+  }
+}

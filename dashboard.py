@@ -51,44 +51,6 @@ def _pct(value):
 def _esc(value):
     return html.escape(str(value or "—"))
 
-def _update_pending_outcomes(cur, conn):
-    rows = _safe(
-        cur,
-        "SELECT position_id, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
-        "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-        "AND position_id IS NOT NULL GROUP BY position_id",
-    )
-    changed = False
-    for pos_id, sym, entry, sl, t1, t2, outcome, _ in rows:
-        try:
-            entry_f = float(entry or 0)
-            if entry_f <= 0:
-                continue
-            cur.execute("SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 1", (sym,))
-            row = cur.fetchone()
-            if not row or not row[0]:
-                continue
-            current = float(row[0])
-            new = None
-            if sl and current <= float(sl):
-                new = "LOSS"
-            elif t2 and current >= float(t2):
-                new = "WIN"
-            elif t1 and current >= float(t1) and outcome == "PENDING":
-                new = "T1_HIT"
-            if new and new != outcome:
-                gain = round((current - entry_f) / entry_f * 100, 1)
-                cur.execute(
-                    "UPDATE signal_history SET outcome=?, outcome_pct=? "
-                    "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
-                    (new, gain, pos_id),
-                )
-                changed = True
-        except Exception:
-            continue
-    if changed:
-        conn.commit()
-
 def _latest_signal(cur):
     # تلاش برای خواندن ستون‌های V2 هم
     try:
@@ -248,7 +210,7 @@ def _open_positions():
         if not conn:
             continue
         cur = conn.cursor()
-        _update_pending_outcomes(cur, conn)
+        # بستن معاملات فقط در موتور اصلی (ahram_pro.py) انجام می‌شه؛ داشبورد فقط نمایش می‌ده
         # نکته‌ی مهم: نمی‌شه چند تا MIN/MAX مختلف (MIN(id) و MAX(v2_score) و
         # MAX(v2_best_symbol)) رو تو یه SELECT با ستون‌های خام (option_price,
         # stop_loss, ...) قاطی کرد -- رفتار SQLite برای اینکه ستون خام از کدوم

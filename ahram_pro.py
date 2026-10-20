@@ -1275,8 +1275,11 @@ def log_signal_to_db(signal, symbol_name, db_name, features=None):
     # ثبت میشن تا پایش بازار و هشدار سلامت درست کار کنن.
     try:
         _c = sqlite3.connect(db_name)
+        # فقط آخرین خرید همین نماد رو نگاه می‌کنیم (نه آخرین ردیف هر نوعی):
+        # چون تحت‌نظر هم هر ۵ دقیقه ثبت میشه و آخرین ردیف همیشه تحت‌نظر بود، فیلتر قبلاً کار نمی‌کرد.
         _last = _c.execute(
-            "SELECT signal_type, time FROM signal_history WHERE symbol=? ORDER BY id DESC LIMIT 1",
+            "SELECT signal_type, time FROM signal_history WHERE symbol=? "
+            "AND signal_type IN ('BUY_CALL','BUY_PUT') ORDER BY id DESC LIMIT 1",
             (symbol_name,),
         ).fetchone()
         _c.close()

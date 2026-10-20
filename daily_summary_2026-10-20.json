@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-20",
+  "generated_at": "2026-10-20 23:43:55",
+  "symbols": {
+    "اهرم": {
+      "prices": {
+        "rows": 39,
+        "valid_price_rows": 39,
+        "open": 73599.0,
+        "close": 69935.0,
+        "high": 73792.0,
+        "low": 69675.0,
+        "volume_sum": 5230602132.0,
+        "volume_max_single": 248525172.0,
+        "first_time": "2026-10-20 09:02:00",
+        "last_time": "2026-10-20 12:29:07",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 1872,
+      "signals": {
+        "counts_by_type": {
+          "WATCH": 39
+        },
+        "actionable": []
+      },
+      "closed_today": [],
+      "open_positions_now": []
+    },
+    "وبملت": {
+      "prices": {
+        "rows": 39,
+        "valid_price_rows": 39,
+        "open": 1559.0,
+        "close": 1534.0,
+        "high": 1559.0,
+        "low": 1527.0,
+        "volume_sum": 209214816273.0,
+        "volume_max_single": 8265097443.0,
+        "first_time": "2026-10-20 09:02:15",
+        "last_time": "2026-10-20 12:29:12",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 2924,
+      "signals": {
+        "counts_by_type": {
+          "WATCH": 39
+        },
+        "actionable": []
+      },
+      "closed_today": [],
+      "open_positions_now": []
+    },
+    "شستا": {
+      "prices": {
+        "rows": 39,
+        "valid_price_rows": 39,
+        "open": 3780.0,
+        "close": 3740.0,
+        "high": 3780.0,
+        "low": 3650.0,
+        "volume_sum": 40115880059.0,
+        "volume_max_single": 2180862173.0,
+        "first_time": "2026-10-20 09:02:35",
+        "last_time": "2026-10-20 12:29:19",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 2574,
+      "signals": {
+        "counts_by_type": {
+          "WATCH": 39
+        },
+        "actionable": []
+      },
+      "closed_today": [],
+      "open_positions_now": []
+    }
+  }
+}
