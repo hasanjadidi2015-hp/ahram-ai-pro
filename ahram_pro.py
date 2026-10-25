@@ -1288,6 +1288,19 @@ def log_signal_to_db(signal, symbol_name, db_name, features=None):
             if _mins < 30:
                 state.log(f"  ⏭ {symbol_name}: {signal.get('type')} تکراریه (آخرین بار {int(_mins)} دقیقه پیش) -- ثبت نشد", "INFO")
                 return
+        # کولداون بعد از زیان: اگه همین نماد و همین نوع خرید به زیان بسته شده و کمتر از ۶۰ دقیقه گذشته،
+        # دوباره همان خرید ثبت نمی‌شه (جلوی ورود دوباره به همان حرکت بعد از حد ضرر گرفته می‌شه)
+        if signal.get("type") in ("BUY_CALL", "BUY_PUT"):
+            _loss = _c.execute(
+                "SELECT outcome_time FROM signal_history WHERE symbol=? AND signal_type=? "
+                "AND outcome='LOSS' AND outcome_time IS NOT NULL ORDER BY id DESC LIMIT 1",
+                (symbol_name, signal.get("type")),
+            ).fetchone()
+            if _loss and _loss[0]:
+                _since = (datetime.now() - datetime.strptime(str(_loss[0])[:19], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60
+                if _since < 60:
+                    state.log(f"  ⏭ {symbol_name}: {signal.get('type')} در کولداون بعد از زیان ({int(_since)} دقیقه پیش) -- ثبت نشد", "INFO")
+                    return
     except Exception as _dup_e:
         state.log(f"  ⚠️ بررسی تکرار سیگنال ناموفق ({symbol_name}): {_dup_e} -- سیگنال ثبت می‌شه", "WARN")
     try:

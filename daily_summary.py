@@ -148,7 +148,27 @@ def main():
     with open(fname, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2, default=str)
     print(f"خلاصه‌ی روز {day} در فایل {fname} ذخیره شد.")
-    print("فایل رو آپلود کن یا محتواش رو بفرست (حجمش کمه).")
+    # خلاصه‌ی کوتاه متنی: کپی‌پذیر در چت (پیام‌های بلند به فایل تبدیل می‌شن)
+    print("----- خلاصه‌ی کوتاه برای چت -----")
+    print(f"تاریخ: {day}")
+    for name, s in result["symbols"].items():
+        if "error" in s:
+            print(f"{name}: خطا -> {s['error']}")
+            continue
+        p = s["prices"]
+        if "error" in p:
+            print(f"{name}: خطای قیمت -> {p['error']}")
+            continue
+        sig = s["signals"]
+        cnt = sig.get("counts_by_type", {}) if "error" not in sig else {}
+        act = sig.get("actionable", []) if "error" not in sig else []
+        closed = s["closed_today"] if isinstance(s["closed_today"], list) else []
+        opn = s["open_positions_now"] if isinstance(s["open_positions_now"], list) else []
+        print(f"{name}: قیمت باز={p['open']} بسته={p['close']} بالا={p['high']} پایین={p['low']} | ردیف={p['rows']}")
+        print(f"  سیگنال: {cnt} | خرید: {len(act)} | بسته‌شده: {len(closed)} | باز: {len(opn)}")
+        for a in act[:5]:
+            print(f"  - {a['time'][11:16]} {a['type']} امتیاز={a['score']} نتیجه={a['outcome']}")
+    print("----- پایان -----")
 
 
 if __name__ == "__main__":

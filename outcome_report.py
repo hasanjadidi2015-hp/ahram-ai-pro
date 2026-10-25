@@ -1,97 +1,128 @@
 # -*- coding: utf-8 -*-
 """
-گزارش سه‌ماهه‌ی نتایج معاملات -- فقط خواندنی، هیچ چیزی رو تغییر نمی‌ده.
+گزارش نتایج معاملات -- فقط خواندنی، هیچ چیزی رو تغییر نمی‌ده.
+فقط معاملات بعد از ۲۵ مهر ۱۴۰۵ (۲۰۲۶-۱۰-۱۷) شمرده می‌شن.
+هر پوزیشن یک‌بار شمرده می‌شه، با آخرین وضعیت قطعی‌اش.
+
 اجرا (کنار فایل‌های .db پروژه):
     python outcome_report.py
 خروجی روی صفحه + فایل outcome_report.txt
 """
-import sqlite3
 import os
-from collections import defaultdict
+import sqlite3
 
 DBS = [("اهرم", "ahram_v2.db"), ("وبملت", "webmellt.db"), ("شستا", "shasta.db")]
+START_DATE = "2026-10-17"   # ۲۵ مهر ۱۴۰۵
+MIN_TRADES = 30             # حداقل معامله‌ی قابل اتکا برای هر نماد
+ZERO_BAND = 0.5             # قدر مطلق درصد کمتر از این = سربه‌سر (۰٪)
 OUT = "outcome_report.txt"
+
+FINAL_SQL = """
+WITH ranked AS (
+    SELECT position_id, signal_type, outcome, outcome_pct, id,
+           ROW_NUMBER() OVER (PARTITION BY position_id ORDER BY id DESC) AS rn
+    FROM signal_history
+    WHERE position_id IS NOT NULL
+      AND signal_type IN ('BUY_CALL', 'BUY_PUT')
+      AND outcome IN ('WIN', 'LOSS', 'BREAK_EVEN')
+      AND time >= ?
+)
+SELECT signal_type, outcome, outcome_pct
+FROM ranked
+WHERE rn = 1
+"""
+
 lines = []
+
 
 def out(s=""):
     print(s)
     lines.append(str(s))
 
+
+def split_by_pct(rows):
+    wins, losses, zeros, nopct = [], [], [], 0
+    for _, _, pct in rows:
+        if pct is None:
+            nopct += 1
+        elif pct > ZERO_BAND:
+            wins.append(pct)
+        elif pct < -ZERO_BAND:
+            losses.append(pct)
+        else:
+            zeros.append(pct)
+    return wins, losses, zeros, nopct
+
+
+def averages(wins, losses):
+    avg_w = sum(wins) / len(wins) if wins else 0.0
+    avg_l = sum(losses) / len(losses) if losses else 0.0
+    return avg_w, avg_l
+
+
 out("=" * 70)
-out("گزارش نتایج معاملات (فقط خواندنی)")
+out("گزارش نتایج معاملات (فقط خواندنی) -- از ۲۵ مهر ۱۴۰۵ به بعد")
 out("=" * 70)
 
-grand = defaultdict(lambda: [0, 0.0])  # outcome -> [count, sum_pct]
+all_rows = []
 
 for name, db in DBS:
     if not os.path.exists(db):
         out(f"\n⚠️ {db} پیدا نشد -- رد شد")
         continue
+
     conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-    cur = conn.cursor()
+    try:
+        rows = conn.execute(FINAL_SQL, (START_DATE,)).fetchall()
+    finally:
+        conn.close()
+
+    all_rows.extend(rows)
+    wins, losses, zeros, nopct = split_by_pct(rows)
+    n_dec = len(wins) + len(losses)
+
     out(f"\n--- {name} ({db}) ---")
+    out(f"   پوزیشن‌های قطعی: {len(rows)} | برد: {len(wins)} | باخت: {len(losses)} | "
+        f"سربه‌سر ۰٪: {len(zeros)} | بی‌درصد: {nopct}")
 
-    cur.execute("""
-        SELECT signal_type, COALESCE(outcome,'NULL'), COUNT(DISTINCT position_id),
-               COUNT(*), ROUND(AVG(outcome_pct),2), MIN(time), MAX(time)
-        FROM signal_history
-        WHERE signal_type IN ('BUY_CALL','BUY_PUT') AND position_id IS NOT NULL
-        GROUP BY signal_type, outcome ORDER BY signal_type, outcome
-    """)
-    rows = cur.fetchall()
     if not rows:
-        out("   هیچ معامله‌ای (با position_id) پیدا نشد")
-    for st, oc, pos_n, rec_n, avg_pct, t0, t1 in rows:
-        out(f"   {st:9s} | {oc:10s} | پوزیشن: {pos_n:4d} | رکورد: {rec_n:5d} | "
-            f"میانگین ٪: {avg_pct}  | بازه: {str(t0)[:10]} تا {str(t1)[:10]}")
-        grand[oc][0] += pos_n
-        grand[oc][1] += (avg_pct or 0) * pos_n
+        out("   هیچ معامله‌ای بعد از ۲۵ مهر پیدا نشد")
+        continue
 
-    # ریز: پوزیشن‌های سربه‌سر و T1 که بعداً LOSS شدن
-    cur.execute("""
-        SELECT COUNT(DISTINCT position_id) FROM signal_history
-        WHERE outcome='LOSS' AND outcome_pct BETWEEN -0.5 AND 0.5
-    """)
-    out(f"   ↳ LOSS با ۰٪ (احتمال Break-Even غلط‌برچسب‌خورده): {cur.fetchone()[0]}")
+    avg_w, avg_l = averages(wins, losses)
+    if n_dec:
+        ev = (len(wins) / n_dec) * avg_w + (len(losses) / n_dec) * avg_l
+        out(f"   میانگین سود برنده: {avg_w:.2f}٪ | میانگین زیان بازنده: {avg_l:.2f}٪")
+        out(f"   امید ریاضی (بدون ۰٪ ها): {ev:.2f}٪")
+    if n_dec < MIN_TRADES:
+        out(f"   ⚠️ کمتر از {MIN_TRADES} معامله‌ی قطعی؛ این عدد قابل اتکا نیست")
 
-    cur.execute("""
-        SELECT COUNT(DISTINCT position_id) FROM signal_history
-        WHERE outcome='LOSS' AND position_id IN (
-            SELECT position_id FROM signal_history WHERE outcome='T1_HIT' OR (outcome_pct>0)
-        )
-    """)
-    out(f"   ↳ پوزیشن‌هایی که سود داشتن ولی بعداً LOSS شدن (اثر T1): {cur.fetchone()[0]}")
-    conn.close()
-
+# ---------- جمع کل ----------
 out("\n" + "=" * 70)
-out("جمع کل همه‌ی نمادها (بر اساس پوزیشن):")
-for oc, (n, s) in sorted(grand.items()):
-    avg = round(s / n, 2) if n else 0
-    out(f"   {oc:10s}: {n:5d} پوزیشن | میانگین ٪ ≈ {avg}")
+out("جمع کل همه‌ی نمادها:")
 
-w = grand.get("WIN", [0])[0]
-l = grand.get("LOSS", [0])[0]
-t1 = grand.get("T1_HIT", [0])[0]
-be = grand.get("BREAK_EVEN", [0])[0]
-if w + l:
-    out(f"\nنرخ برد فعلی (WIN/(WIN+LOSS)): {round(w/(w+l)*100,1)}٪")
-    out(f"نرخ برد اگه T1 هم برد حساب بشه: {round((w+t1)/(w+t1+l)*100,1)}٪")
+wins, losses, zeros, nopct = split_by_pct(all_rows)
+n_dec = len(wins) + len(losses)
+out(f"   پوزیشن‌های قطعی: {len(all_rows)} | برد: {len(wins)} | باخت: {len(losses)} | "
+    f"سربه‌سر ۰٪: {len(zeros)} | بی‌درصد: {nopct}")
 
-# امید ریاضی: میانگین سود برنده‌ها و میانگین زیان بازنده‌ها (سر به‌سر و بی‌نتیجه کنار گذاشته می‌شن)
-win_sum = grand.get("WIN", [0, 0.0])[1]
-loss_sum = grand.get("LOSS", [0, 0.0])[1]
-t1_sum = grand.get("T1_HIT", [0, 0.0])[1]
-if (w + t1 + l) > 0:
-    avg_win = (win_sum + t1_sum) / (w + t1) if (w + t1) else 0.0
-    avg_loss = loss_sum / l if l else 0.0
-    p_win = (w + t1) / (w + t1 + l)
-    ev = p_win * avg_win + (1 - p_win) * avg_loss
-    out("\n--- امید ریاضی (هر معامله، درصد) ---")
-    out(f"میانگین سود برنده‌ها: {round(avg_win,2)}٪ | میانگین زیان بازنده‌ها: {round(avg_loss,2)}٪")
-    out(f"امید ریاضی هر معامله: {round(ev,2)}٪  ({'مثبت' if ev > 0 else 'منفی'})")
-    out("توجه: این عدد با تعداد معاملات کم قابل اتکا نیست؛ حداقل ۳۰ معامله در هر نماد لازمه.")
-    out("توجه: معاملات INCONCLUSIVE (داده‌ی قدیمی بی‌برچسب) و PENDING در این محاسبه نیستن.")
-    out("توجه: BREAK_EVEN و LOSS های صفر-درصدی قدیمی (قبل از اصلاح برچسب) ممکنه میانگین زیان را کم‌تر نشون بدن.")
+if n_dec:
+    avg_w, avg_l = averages(wins, losses)
+    n_pess = n_dec + len(zeros)
+    ev_opt = (len(wins) / n_dec) * avg_w + (len(losses) / n_dec) * avg_l
+    ev_pess = (len(wins) / n_pess) * avg_w + ((len(losses) + len(zeros)) / n_pess) * avg_l
+
+    out(f"   میانگین سود برنده: {avg_w:.2f}٪ | میانگین زیان بازنده: {avg_l:.2f}٪")
+    out(f"   نرخ برد: {len(wins) / n_dec * 100:.1f}٪")
+    out(f"   امید ریاضی خوش‌بینانه (۰٪ ها کنار): {ev_opt:.2f}٪")
+    out(f"   امید ریاضی بدبینانه (۰٪ ها زیان): {ev_pess:.2f}٪")
+    if n_dec < MIN_TRADES * 3:
+        out("   ⚠️ تعداد کل معاملات قطعی کم است؛ هنوز برای تصمیم کافی نیست")
+else:
+    out("   معامله‌ی قطعی بعد از ۲۵ مهر وجود ندارد")
+
+out("\nتوجه: معاملات INCONCLUSIVE (داده‌ی قدیمی) و PENDING در محاسبه نیستند.")
+out("توجه: سربه‌سر ۰٪ ها ممکن است زیان واقعی باشند؛ دو حالت بالا این بازه را نشان می‌دهد.")
 out("=" * 70)
 
 with open(OUT, "w", encoding="utf-8") as f:

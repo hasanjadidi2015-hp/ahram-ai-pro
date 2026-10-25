@@ -1,25 +1,27 @@
 {
   "date": "2026-10-21",
-  "generated_at": "2026-10-21 00:19:57",
+  "generated_at": "2026-10-21 21:40:50",
   "symbols": {
     "اهرم": {
       "prices": {
-        "rows": 0,
-        "valid_price_rows": 0,
-        "open": null,
-        "close": null,
-        "high": null,
-        "low": null,
-        "volume_sum": null,
-        "volume_max_single": null,
-        "first_time": null,
-        "last_time": null,
+        "rows": 39,
+        "valid_price_rows": 39,
+        "open": 70896.0,
+        "close": 68500.0,
+        "high": 70896.0,
+        "low": 68350.0,
+        "volume_sum": 5027948758.0,
+        "volume_max_single": 218255700.0,
+        "first_time": "2026-10-21 09:00:15",
+        "last_time": "2026-10-21 12:29:20",
         "duplicate_time_rows": 0,
         "invalid_price_rows": 0
       },
-      "options_rows_today": 0,
+      "options_rows_today": 1920,
       "signals": {
-        "counts_by_type": {},
+        "counts_by_type": {
+          "WATCH": 39
+        },
         "actionable": []
       },
       "closed_today": [],
@@ -27,22 +29,24 @@
     },
     "وبملت": {
       "prices": {
-        "rows": 0,
-        "valid_price_rows": 0,
-        "open": null,
-        "close": null,
-        "high": null,
-        "low": null,
-        "volume_sum": null,
-        "volume_max_single": null,
-        "first_time": null,
-        "last_time": null,
+        "rows": 39,
+        "valid_price_rows": 39,
+        "open": 1520.0,
+        "close": 1507.0,
+        "high": 1544.0,
+        "low": 1507.0,
+        "volume_sum": 207060307889.0,
+        "volume_max_single": 7798560945.0,
+        "first_time": "2026-10-21 09:00:35",
+        "last_time": "2026-10-21 12:29:28",
         "duplicate_time_rows": 0,
         "invalid_price_rows": 0
       },
-      "options_rows_today": 0,
+      "options_rows_today": 3004,
       "signals": {
-        "counts_by_type": {},
+        "counts_by_type": {
+          "WATCH": 39
+        },
         "actionable": []
       },
       "closed_today": [],
@@ -50,22 +54,24 @@
     },
     "شستا": {
       "prices": {
-        "rows": 0,
-        "valid_price_rows": 0,
-        "open": null,
-        "close": null,
-        "high": null,
-        "low": null,
-        "volume_sum": null,
-        "volume_max_single": null,
-        "first_time": null,
-        "last_time": null,
+        "rows": 1,
+        "valid_price_rows": 1,
+        "open": 3740.0,
+        "close": 3740.0,
+        "high": 3740.0,
+        "low": 3740.0,
+        "volume_sum": 0.0,
+        "volume_max_single": 0.0,
+        "first_time": "2026-10-21 09:00:49",
+        "last_time": "2026-10-21 09:00:49",
         "duplicate_time_rows": 0,
         "invalid_price_rows": 0
       },
-      "options_rows_today": 0,
+      "options_rows_today": 46,
       "signals": {
-        "counts_by_type": {},
+        "counts_by_type": {
+          "WATCH": 39
+        },
         "actionable": []
       },
       "closed_today": [],
