@@ -1,0 +1,127 @@
+{
+  "date": "2026-10-27",
+  "generated_at": "2026-10-27 21:14:16",
+  "symbols": {
+    "اهرم": {
+      "prices": {
+        "rows": 40,
+        "valid_price_rows": 40,
+        "open": 73906.0,
+        "close": 69871.0,
+        "high": 73906.0,
+        "low": 69843.0,
+        "volume_sum": 5388186017.0,
+        "volume_max_single": 212430401.0,
+        "first_time": "2026-10-27 09:01:33",
+        "last_time": "2026-10-27 12:29:34",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 2800,
+      "signals": {
+        "counts_by_type": {
+          "WATCH": 40
+        },
+        "actionable": []
+      },
+      "closed_today": [],
+      "open_positions_now": []
+    },
+    "وبملت": {
+      "prices": {
+        "rows": 40,
+        "valid_price_rows": 40,
+        "open": 1444.0,
+        "close": 1403.0,
+        "high": 1444.0,
+        "low": 1394.0,
+        "volume_sum": 149994084708.0,
+        "volume_max_single": 6067413784.0,
+        "first_time": "2026-10-27 09:01:39",
+        "last_time": "2026-10-27 12:29:38",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 3058,
+      "signals": {
+        "counts_by_type": {
+          "WATCH": 33,
+          "BUY_PUT": 2
+        },
+        "actionable": [
+          {
+            "time": "2026-10-27 10:15:55",
+            "type": "BUY_PUT",
+            "score": 80,
+            "option": "طملت8074",
+            "option_price": 41.0,
+            "outcome": "LOSS",
+            "outcome_pct": -22.0
+          },
+          {
+            "time": "2026-10-27 10:48:37",
+            "type": "BUY_PUT",
+            "score": 69,
+            "option": "طملت8074",
+            "option_price": 38.0,
+            "outcome": "LOSS",
+            "outcome_pct": -22.0
+          }
+        ]
+      },
+      "closed_today": [
+        {
+          "time": "2026-10-27 10:59:09",
+          "type": "BUY_PUT",
+          "option": "طملت8074",
+          "entry_price": 41.0,
+          "result": "LOSS",
+          "pct": -22.0
+        },
+        {
+          "time": "2026-10-27 10:59:09",
+          "type": "BUY_PUT",
+          "option": "طملت8074",
+          "entry_price": 38.0,
+          "result": "LOSS",
+          "pct": -22.0
+        }
+      ],
+      "open_positions_now": [
+        {
+          "position_id": "وبملت-طملت9041-BUY_PUT-20261025-090756",
+          "type": "BUY_PUT",
+          "option": "طملت9041",
+          "entry_price": 70.0,
+          "entry_time": "2026-10-25 09:07:56",
+          "rows_in_db": 2
+        }
+      ]
+    },
+    "شستا": {
+      "prices": {
+        "rows": 40,
+        "valid_price_rows": 40,
+        "open": 3460.0,
+        "close": 3350.0,
+        "high": 3460.0,
+        "low": 3290.0,
+        "volume_sum": 23983769499.0,
+        "volume_max_single": 1058978474.0,
+        "first_time": "2026-10-27 09:01:50",
+        "last_time": "2026-10-27 12:29:47",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 3037,
+      "signals": {
+        "counts_by_type": {
+          "WATCH": 40
+        },
+        "actionable": []
+      },
+      "closed_today": [],
+      "open_positions_now": []
+    }
+  }
+}
