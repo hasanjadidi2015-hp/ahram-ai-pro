@@ -10,6 +10,9 @@
 - Risk Engine V2 + IV Engine V2 + Scoring Engine V2 + Decision Engine V2
 - خروجی جدید CALL SCORE با breakdown، بدون شکستن سیگنال قدیمی (برای بک‌تست)
 - dashboard V5 نمایش جدید
+- [نسخه‌ی اصلاح‌شده] پایش خروج فقط با قیمت تازه (price_fresh=1) و تأیید دو قرائت
+- [نسخه‌ی اصلاح‌شده] کولداون بعد از زیان واقعاً کار می‌کند (اتصال دیتابیس تا آخر بسته نمی‌شود)
+- [نسخه‌ی اصلاح‌شده] کاندیدهای V2 فقط قراردادهای با قیمت تازه هستند
 """
 import sys
 import os
@@ -410,7 +413,7 @@ def analyze_technicals(symbol_config):
                 # HV از market_data قبلاً گرفته شده ولی اینجا هم ذخیره کن
             except Exception as _ind_e:
                 state.log(f"  ⚠️ خطا جمع‌آوری indicators: {_ind_e}", "WARN")
-            
+
             strategy.close()
             if analysis:
                 action, confidence, score, price = analysis
@@ -486,11 +489,9 @@ def analyze_technicals(symbol_config):
 
     return result
 
-
 def _get_top_candidates_v5(db_path, signal_type, ua_price, top_n=5):
     """مثل option_selector.get_best_option ولی چند کاندید برمی‌گردونه (برای V2 ranking).
-    از همون منطق فیلتر (آخرین اسنپ‌شات + DTE مجاز) استفاده می‌کنه تا قرارداد
-    منقضی‌شده انتخاب نشه -- دقیقاً همون فیکسی که تو option_selector.py هست."""
+    فقط قراردادهای با قیمت تازه (price_fresh=1) در نظر گرفته می‌شوند."""
     if not os.path.exists(db_path) or signal_type not in ("BUY_CALL", "BUY_PUT"):
         return []
     db_types = ["CALL", "call", "C", "خرید"] if signal_type == "BUY_CALL" else ["PUT", "put", "P", "فروش"]
@@ -503,17 +504,19 @@ def _get_top_candidates_v5(db_path, signal_type, ua_price, top_n=5):
         if not tbl:
             return []
         table_name = tbl[0]
+        from option_selector import _fresh_clause
+        fresh = _fresh_clause(cur, table_name)
         cur.execute(f"SELECT MAX(time) FROM {table_name}")
         latest_row = cur.fetchone()
         latest_time = latest_row[0] if latest_row else None
         if not latest_time:
             return []
         placeholders = ",".join("?" for _ in db_types)
-        cur.execute(f"SELECT * FROM {table_name} WHERE option_type IN ({placeholders}) AND time = ?",
+        cur.execute(f"SELECT * FROM {table_name} WHERE option_type IN ({placeholders}) AND time = ?{fresh}",
                     tuple(db_types) + (latest_time,))
         rows = cur.fetchall()
         if not rows:
-            cur.execute(f"SELECT * FROM {table_name} WHERE option_type IN ({placeholders}) AND time >= datetime(?, '-10 minutes')",
+            cur.execute(f"SELECT * FROM {table_name} WHERE option_type IN ({placeholders}) AND time >= datetime(?, '-10 minutes'){fresh}",
                         tuple(db_types) + (latest_time,))
             rows = cur.fetchall()
         conn.close()
@@ -723,7 +726,7 @@ def analyze_options(symbol_config, stock_action, stock_confidence, stock_price):
             # ساخت market_data ساده برای sentiment
             sentiment_input = {
                 "money_flow": {},  # در run_cycle اصلی پر می‌شود
-                "order_book": {}, 
+                "order_book": {},
                 "news": [],
                 "indices": {}
             }
@@ -938,7 +941,7 @@ def generate_multi_layer_signal(symbol_config, technicals, options_analysis, mar
         else:
             checks["vace_adx_ok"] = True
             reasons.append(f"✅ VACE ADX: روند قوی (ADX {dyn_adx.get('current_adx')} > {dyn_adx.get('threshold')})")
-        
+
         # Fibo No-Trade Zone
         fibo_f = vace_data.get("fibo_filter", {})
         if not fibo_f.get("allow_entry", True):
@@ -1119,12 +1122,12 @@ def _calculate_targets(option, signal_type, vace_data=None, technicals=None, sl_
         auto_sl = vace_data.get("auto_sl", {})
         if auto_sl and auto_sl.get("sl_pct"):
             sl_pct = abs(auto_sl["sl_pct"]) / 100.0
-        
+
         # ATR Factor
         atr_f = vace_data.get("atr_factor", {})
         if atr_f and atr_f.get("atr_factor"):
             atr_factor = atr_f["atr_factor"]
-        
+
         # Fibo TP1 override
         fibo_f = vace_data.get("fibo_filter", {})
         if fibo_f and fibo_f.get("tp1_override"):
@@ -1145,7 +1148,7 @@ def _calculate_targets(option, signal_type, vace_data=None, technicals=None, sl_
     # Tiered TP با ATR Factor داینامیک (VACE)
     # تخمین ATR از قیمت آپشن
     atr_value = entry * 0.04 * atr_factor  # تخمین اولیه
-    
+
     if vace_data and calculate_tiered_tp:
         try:
             tiered = calculate_tiered_tp(entry, atr_value, atr_factor, option.get("option_type", "CALL"))
@@ -1156,7 +1159,7 @@ def _calculate_targets(option, signal_type, vace_data=None, technicals=None, sl_
                     # TP1 روی سطح 38.2% فیبو (تبدیل به قیمت آپشن - تخمین)
                     # برای سادگی: TP1 override فقط برای نمایش، محاسبه دقیق نیاز به قیمت سهم دارد
                     pass
-                
+
                 return {
                     "entry": round(entry),
                     "stop_loss": round(entry * (1 - sl_pct)),
@@ -1270,26 +1273,23 @@ def log_signal_to_db(signal, symbol_name, db_name, features=None):
     if "--test" in sys.argv:
         state.log(f"  🧪 TEST: سیگنال {symbol_name} در دیتابیس ثبت نشد (حالت تست)", "WARN")
         return
-    # جلوگیری از تکرار فقط برای تصمیم‌های واقعی (خرید کال/پوت): اگه همون خرید برای همون
-    # نماد کمتر از ۳۰ دقیقه پیش ثبت شده، دوباره ثبت نمی‌شه. سیگنال‌های "تحت نظر" هر ۵ دقیقه
-    # ثبت میشن تا پایش بازار و هشدار سلامت درست کار کنن.
+
+    # جلوگیری از تکرار و کولداون بعد از زیان (نسخه‌ی اصلاح‌شده: اتصال تا آخرین کوئری باز می‌ماند)
+    _c = None
     try:
         _c = sqlite3.connect(db_name)
-        # فقط آخرین خرید همین نماد رو نگاه می‌کنیم (نه آخرین ردیف هر نوعی):
-        # چون تحت‌نظر هم هر ۵ دقیقه ثبت میشه و آخرین ردیف همیشه تحت‌نظر بود، فیلتر قبلاً کار نمی‌کرد.
+        # فقط آخرین خرید همین نماد رو نگاه می‌کنیم (نه آخرین ردیف هر نوعی)
         _last = _c.execute(
             "SELECT signal_type, time FROM signal_history WHERE symbol=? "
             "AND signal_type IN ('BUY_CALL','BUY_PUT') ORDER BY id DESC LIMIT 1",
             (symbol_name,),
         ).fetchone()
-        _c.close()
         if _last and _last[0] == signal.get("type") and signal.get("type") in ("BUY_CALL", "BUY_PUT"):
             _mins = (datetime.now() - datetime.strptime(str(_last[1])[:19], "%Y-%m-%d %H:%M:%S")).total_seconds() / 60
             if _mins < 30:
                 state.log(f"  ⏭ {symbol_name}: {signal.get('type')} تکراریه (آخرین بار {int(_mins)} دقیقه پیش) -- ثبت نشد", "INFO")
                 return
-        # کولداون بعد از زیان: اگه همین نماد و همین نوع خرید به زیان بسته شده و کمتر از ۶۰ دقیقه گذشته،
-        # دوباره همان خرید ثبت نمی‌شه (جلوی ورود دوباره به همان حرکت بعد از حد ضرر گرفته می‌شه)
+        # کولداون بعد از زیان: همین نماد و همین نوع خرید، به زیان بسته شده و کمتر از ۶۰ دقیقه گذشته
         if signal.get("type") in ("BUY_CALL", "BUY_PUT"):
             _loss = _c.execute(
                 "SELECT outcome_time FROM signal_history WHERE symbol=? AND signal_type=? "
@@ -1302,7 +1302,11 @@ def log_signal_to_db(signal, symbol_name, db_name, features=None):
                     state.log(f"  ⏭ {symbol_name}: {signal.get('type')} در کولداون بعد از زیان ({int(_since)} دقیقه پیش) -- ثبت نشد", "INFO")
                     return
     except Exception as _dup_e:
-        state.log(f"  ⚠️ بررسی تکرار سیگنال ناموفق ({symbol_name}): {_dup_e} -- سیگنال ثبت می‌شه", "WARN")
+        state.log(f"  ⚠️ بررسی تکرار/کولداون ناموفق ({symbol_name}): {_dup_e} -- سیگنال ثبت می‌شه", "WARN")
+    finally:
+        if _c is not None:
+            _c.close()
+
     try:
         conn = sqlite3.connect(db_name)
         cur = conn.cursor()
@@ -1378,8 +1382,8 @@ def log_signal_to_db(signal, symbol_name, db_name, features=None):
             v2_best_sym = v2_decision["best_contract"].get("symbol")
 
         cur.execute("""
-            INSERT INTO signal_history 
-            (time, symbol, signal_type, composite_score, option_symbol, 
+            INSERT INTO signal_history
+            (time, symbol, signal_type, composite_score, option_symbol,
              option_price, strike_price, stop_loss, target1, target2, outcome, details, position_id,
              v2_score, v2_decision, v2_best_symbol, features)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1410,65 +1414,64 @@ def log_signal_to_db(signal, symbol_name, db_name, features=None):
 
 
 def check_live_exits_for_symbol(name, db):
+    """پایش خروج زنده. هر خروج یا هدف فقط با دو قرائت پشت‌سرهم تأیید می‌شود.
+    فقط قیمت‌های تازه (price_fresh=1) استفاده می‌شوند. قرائت منفرد هرگز پوزیشن را نمی‌بندد."""
     alerts = []
     try:
         conn = sqlite3.connect(db)
         cur = conn.cursor()
+        # ورود، حد ضرر و اهداف از اولین ردیف هر پوزیشن (هدف مبنای معامله است)
         cur.execute(
-            "SELECT position_id, option_symbol, option_price, stop_loss, target1, target2, outcome, MIN(id) "
-            "FROM signal_history WHERE outcome IN ('PENDING','T1_HIT') "
-            "AND position_id IS NOT NULL GROUP BY position_id"
+            "SELECT s.position_id, s.option_symbol, s.option_price, s.stop_loss, s.target1, s.target2, s.outcome "
+            "FROM signal_history s "
+            "JOIN (SELECT position_id, MIN(id) AS mid FROM signal_history "
+            "      WHERE outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL GROUP BY position_id) m "
+            "ON s.id = m.mid"
         )
         rows = cur.fetchall()
-        for pos_id, sym, entry, sl, t1, t2, outcome, _min_id in rows:
-            entry_f = float(entry) if entry else 0
+        for pos_id, sym, entry, sl, t1, t2, outcome in rows:
+            entry_f = float(entry) if entry else 0.0
             if entry_f <= 0:
                 continue
-            cur.execute("SELECT option_price FROM options WHERE symbol=? ORDER BY id DESC LIMIT 2", (sym,))
-            _prs = cur.fetchall()
-            pr = _prs[0] if _prs else None
-            prev_price = float(_prs[1][0]) if len(_prs) > 1 and _prs[1][0] else None
-            if not pr or not pr[0]:
-                # قبلاً اینجا بی‌صدا continue می‌شد: پوزیشن باز بدون حد ضرر و بدون هیچ هشداری
-                # از پایش خارج می‌شد. حالا هر چرخه صریحاً WARN می‌ده تا دیده بشه.
-                state.log(f"  ⚠️ پایش خروج متوقف: قیمت {sym} در جدول options پیدا نشد (position {pos_id}) -- حد ضرر اجرا نمی‌شه", "WARN")
+            cur.execute(
+                "SELECT option_price FROM options WHERE symbol=? AND option_price>0 AND price_fresh=1 ORDER BY id DESC LIMIT 2",
+                (sym,),
+            )
+            readings = [float(r[0]) for r in cur.fetchall()]
+            if not readings:
+                state.log(f"  ⚠️ پایش خروج متوقف: قیمت تازه {sym} در options پیدا نشد (position {pos_id}) -- حد ضرر اجرا نمی‌شه", "WARN")
                 continue
-            cur_price = float(pr[0])
+            cur_price = readings[0]
+            prev_price = readings[1] if len(readings) > 1 else None
             sl_f = float(sl) if sl else None
             t1_f = float(t1) if t1 else None
             t2_f = float(t2) if t2 else None
-            
-            # محاسبه PnL
-            pnl_pct = ((cur_price - entry_f) / entry_f) * 100 if entry_f > 0 else 0
-            
-            new_outcome = None
-            
-            # VACE Break-Even: اگر PnL >= 8.5%، SL به قیمت ورود منتقل می‌شود (Risk-Free)
+            pnl_pct = (cur_price - entry_f) / entry_f * 100
+
+            # VACE Break-Even (اگر ماژول موجود باشد)
             if _HAS_VACE_V2 and check_break_even and outcome == "PENDING":
                 try:
-                    if check_break_even(pnl_pct, be_threshold=8.5):
-                        # SL را به entry منتقل کن - فقط اگر SL فعلی پایین‌تر از entry است
-                        if sl_f and sl_f < entry_f:
-                            cur.execute(
-                                "UPDATE signal_history SET stop_loss=? WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
-                                (entry_f, pos_id)
-                            )
-                            state.log(f"  🔬 VACE Break-Even: {sym} PnL {pnl_pct:.1f}% >= 8.5% -> SL به {entry_f:.0f} (Risk-Free)", "INFO")
-                            sl_f = entry_f  # آپدیت برای چک بعدی
-                except Exception as _be_e:
+                    if check_break_even(pnl_pct, be_threshold=8.5) and sl_f and sl_f < entry_f:
+                        cur.execute(
+                            "UPDATE signal_history SET stop_loss=? WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
+                            (entry_f, pos_id),
+                        )
+                        state.log(f"  🔬 VACE Break-Even: {sym} PnL {pnl_pct:.1f}% -> SL به {entry_f:.0f}", "INFO")
+                        sl_f = entry_f
+                except Exception:
                     pass
-            
-            if sl_f and cur_price <= sl_f and (prev_price is None or prev_price > sl_f):
-                # خروج روی حد ضرر فقط با تأیید دو قرائت پشت‌سرهم. قرائت منفرد غیرعادی
-                # (مثل ۲۵۰۰ ریال به‌جای ۶۰۰۰، که باعث زیان ۳۶.۷٪ کاذب شد) نباید پوزیشن را ببندد.
-                state.log(f"  ⚠️ حد ضرر {sym}: قیمت {cur_price} زیر حد {sl_f}، ولی قرائت قبلی {prev_price} تأییدش نمی‌کنه -- منتظر تأیید (پوزیشن باز می‌ماند)", "WARN")
-                cur_price = prev_price if prev_price is not None else cur_price
-            if sl_f and cur_price <= sl_f:
-                # خروج روی حد ضرر: بسته به اینکه حد ضرر کجاست، نتیجه فرق می‌کنه.
-                #  - اگه قیمت خروج بالای ورود باشه (حد ضرر دنبال‌شونده بالای ورود رفته): سود است -> WIN
-                #  - اگه برابر ورود باشه (Break-Even): سر به‌سر -> BREAK_EVEN
-                #  - اگه زیر ورود باشه: باخت -> LOSS
-                # قبلاً هر خروج روی حد ضرر LOSS می‌شد، حتی با سود (مثلاً +14.5%).
+
+            def confirmed(level, side):
+                # فقط اگر هر دو قرائت آخر در همان سمت سطح باشند. قرائت قبلی نباشد = تأیید نمی‌شود.
+                if prev_price is None:
+                    return False
+                if side == "below":
+                    return cur_price <= level and prev_price <= level
+                return cur_price >= level and prev_price >= level
+
+            new_outcome = None
+            if sl_f and confirmed(sl_f, "below"):
+                # خروج روی حد ضرر: سود (WIN)، سربه‌سر (BREAK_EVEN) یا زیان (LOSS) بر اساس قیمت ورود
                 _pnl = (cur_price - entry_f) / entry_f
                 if _pnl > 0.001:
                     new_outcome = "WIN"
@@ -1476,13 +1479,15 @@ def check_live_exits_for_symbol(name, db):
                     new_outcome = "BREAK_EVEN"
                 else:
                     new_outcome = "LOSS"
-            elif t2_f and cur_price >= t2_f:
+            elif sl_f and cur_price <= sl_f:
+                state.log(f"  ⚠️ حد ضرر {sym}: قیمت {cur_price} زیر {sl_f} ولی تأیید نشد (قرائت قبلی {prev_price}) -- باز می‌ماند", "WARN")
+            elif t2_f and confirmed(t2_f, "above"):
                 new_outcome = "WIN"
-            elif t1_f and cur_price >= t1_f and outcome == "PENDING":
+            elif t1_f and outcome == "PENDING" and confirmed(t1_f, "above"):
                 new_outcome = "T1_HIT"
-            
+
             if new_outcome and new_outcome != outcome:
-                pct = round(((cur_price - entry_f) / entry_f) * 100, 1)
+                pct = round(pnl_pct, 1)
                 cur.execute(
                     "UPDATE signal_history SET outcome=?, outcome_pct=?, outcome_time=? "
                     "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
@@ -1496,7 +1501,7 @@ def check_live_exits_for_symbol(name, db):
         return
     for sym, new_outcome, pct, cur_price in alerts:
         label = {"WIN": "🎯 رسیدن به هدف نهایی", "LOSS": "🛑 برخورد به حد ضرر",
-                  "T1_HIT": "✅ رسیدن به هدف اول"}.get(new_outcome, new_outcome)
+                 "BREAK_EVEN": "⚖️ سربه‌سر", "T1_HIT": "✅ رسیدن به هدف اول"}.get(new_outcome, new_outcome)
         state.log(f"  {label}: {sym} ({pct:+}%)")
         msg = f"{label}\n\nنماد: {name}\nقرارداد: {sym}\nقیمت فعلی: {cur_price:,.0f}\nسود/زیان: {pct:+}%"
         send_notification({"type": "EXIT", "message": msg}, name)
@@ -1509,6 +1514,7 @@ def count_real_open_positions_from_db():
         db_path = sym_cfg["db"]
         if not os.path.exists(db_path):
             continue
+        conn = None
         try:
             conn = sqlite3.connect(db_path)
             cur = conn.cursor()
@@ -1520,15 +1526,12 @@ def count_real_open_positions_from_db():
             row = cur.fetchone()
             if row and row[0]:
                 total += int(row[0])
-            conn.close()
         except Exception as e:
             # قبلاً بی‌صدا رد می‌شد؛ حالا خطا دیده میشه (قانون: fallback ساکت ممنوع)
             state.log(f"  ⚠️ شمارش پوزیشن‌های باز از {db_path} ناموفق بود: {e}", "WARN")
-            try:
+        finally:
+            if conn is not None:
                 conn.close()
-            except:
-                pass
-            continue
     return total
 
 def analyze_symbol(symbol_config):

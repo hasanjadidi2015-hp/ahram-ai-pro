@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 ماژول انتخاب قراردادهای آپشن (Option Selector Engine)
-نسخه ضدخطا (Bulletproof) - تاریخ: 2026-09-06
+نسخه‌ی اصلاح‌شده: فقط قراردادهای با قیمت تازه (price_fresh = 1) انتخاب می‌شوند.
 دارای سیستم اعتبارسنجی ۳ لایه:
   ۱. فیلتر آخرین اسنپ‌شات بازار (Latest Snapshot Only)
   ۲. فیلتر انقضای تقویمی (Future Expiry Validation)
   ۳. فیلتر نوسان‌گیری کوتاه‌مدت (10 <= DTE <= 60)
+  ۴. فیلتر تازگی قیمت (price_fresh = 1)
 """
 
 import os
-import sys
 import sqlite3
 import logging
-from datetime import datetime
 from typing import Dict, Any, Optional
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,11 +22,21 @@ MIN_DTE = 10            # حداقل روز تا سررسید
 MAX_DTE = 60            # حداکثر روز تا سررسید
 MIN_VOLUME = 0          # بدون محدودیت حجم در اسنپ‌شات اولیه
 
-
 PARITY_WARN_PCT = 1.0
 
+
+def _fresh_clause(cur, table_name):
+    """فیلتر تازگی قیمت: اگر ستون price_fresh وجود داشته باشد، فقط قراردادهای تازه انتخاب می‌شوند."""
+    cur.execute(f"PRAGMA table_info({table_name})")
+    cols = {r[1] for r in cur.fetchall()}
+    if "price_fresh" in cols:
+        return " AND price_fresh = 1"
+    logger.warning("⚠️ ستون price_fresh در جدول نیست؛ فیلتر تازگی اعمال نشد (option_collector را یک‌بار اجرا کنید)")
+    return ""
+
+
 def get_best_option(db_path: str, ua_symbol: str, signal_type: str, ua_price: float) -> Optional[Dict[str, Any]]:
-    """انتخاب دقیق بهترین قرارداد آپشن فعالِ همان روز"""
+    """انتخاب دقیق بهترین قرارداد آپشن فعالِ همان روز (فقط با قیمت تازه)"""
     if not os.path.exists(db_path):
         logger.error(f"❌ دیتابیس در مسیر {db_path} یافت نشد.")
         return None
@@ -64,12 +73,15 @@ def get_best_option(db_path: str, ua_symbol: str, signal_type: str, ua_price: fl
             logger.warning("⚠️ جدول آپشن‌ها کاملاً خالی است.")
             return None
 
+        # [لایه حفاظتی ۴] فیلتر تازگی قیمت
+        fresh = _fresh_clause(cur, table_name)
+
         # ۳. کوئری انحصاری: فقط رکوردهای ثبت‌شده در آخرین سیکل بازار
         placeholders = ','.join('?' for _ in db_types)
         query = f"""
             SELECT * FROM {table_name}
             WHERE option_type IN ({placeholders})
-            AND time = ?
+            AND time = ?{fresh}
         """
         cur.execute(query, tuple(db_types) + (latest_time,))
         rows = cur.fetchall()
@@ -79,7 +91,7 @@ def get_best_option(db_path: str, ua_symbol: str, signal_type: str, ua_price: fl
             query = f"""
                 SELECT * FROM {table_name}
                 WHERE option_type IN ({placeholders})
-                AND time >= datetime(?, '-10 minutes')
+                AND time >= datetime(?, '-10 minutes'){fresh}
             """
             cur.execute(query, tuple(db_types) + (latest_time,))
             rows = cur.fetchall()
@@ -88,7 +100,6 @@ def get_best_option(db_path: str, ua_symbol: str, signal_type: str, ua_price: fl
 
         for r in rows:
             opt = dict(r)
-            sym = opt.get('symbol', '')
             strike = opt.get('strike_price', opt.get('strike'))
             dte = opt.get('days_to_expire', opt.get('dte', opt.get('days_to_maturity')))
             opt_price = opt.get('option_price', 0)
@@ -150,7 +161,7 @@ def get_best_option(db_path: str, ua_symbol: str, signal_type: str, ua_price: fl
             except Exception:
                 valid_options.sort(key=lambda x: x['dist_pct'])
                 best_option = valid_options[0]
-            _parity_warn(cur, table_name, latest_time, best_option, signal_type, ua_price)
+            _parity_warn(cur, table_name, latest_time, best_option, signal_type, ua_price, fresh)
 
             logger.info(f"✅ قرارداد فعال بازار انتخاب شد: {best_option.get('symbol')} | "
                         f"اعمال: {best_option['strike_price_clean']:,.0f} | "
@@ -159,7 +170,7 @@ def get_best_option(db_path: str, ua_symbol: str, signal_type: str, ua_price: fl
                         f"تاریخ سررسید: {best_option.get('expire_date', '-')} | "
                         f"زمان اسنپ‌شات: {latest_time}")
         else:
-            logger.warning(f"⚠️ در آخرین اسنپ‌شات زنده ({latest_time}) هیچ قرارداد فعالی با شرایط {MIN_DTE}<=DTE<={MAX_DTE} یافت نشد.")
+            logger.warning(f"⚠️ در آخرین اسنپ‌شات زنده ({latest_time}) هیچ قرارداد تازه‌ای با شرایط {MIN_DTE}<=DTE<={MAX_DTE} یافت نشد.")
 
     except Exception as e:
         logger.error(f"❌ خطا در پردازش انتخاب آپشن: {e}")
@@ -192,7 +203,8 @@ def get_best_option(db_path: str, ua_symbol: str, signal_type: str, ua_price: fl
             logger.warning(f"enrich failed: {_ee}")
     return best_option
 
-def _parity_warn(cur, table_name, latest_time, best, signal_type, ua_price):
+
+def _parity_warn(cur, table_name, latest_time, best, signal_type, ua_price, fresh=""):
     """Put-call parity sanity check vs same-strike mirror. WARN only, never blocks."""
     try:
         if not best or not ua_price:
@@ -203,22 +215,22 @@ def _parity_warn(cur, table_name, latest_time, best, signal_type, ua_price):
         if not strike or not exp or float(my_price) <= 0:
             return
         if signal_type == "BUY_CALL":
-            mirror_types = ("PUT", "put", "P", "\u0641\u0631\u0648\u0634")
+            mirror_types = ("PUT", "put", "P", "فروش")
             mine_is_call = True
         elif signal_type == "BUY_PUT":
-            mirror_types = ("CALL", "call", "C", "\u062e\u0631\u06cc\u062f")
+            mirror_types = ("CALL", "call", "C", "خرید")
             mine_is_call = False
         else:
             return
         ph = ",".join("?" for _ in mirror_types)
         cur.execute(
-            "SELECT * FROM " + table_name + " WHERE option_type IN (" + ph + ") AND time = ? AND expire_date = ?",
+            "SELECT * FROM " + table_name + " WHERE option_type IN (" + ph + ") AND time = ? AND expire_date = ?" + fresh,
             tuple(mirror_types) + (latest_time, exp),
         )
         rows = cur.fetchall()
         if not rows:
             cur.execute(
-                "SELECT * FROM " + table_name + " WHERE option_type IN (" + ph + ") AND time >= datetime(?, '-10 minutes') AND expire_date = ?",
+                "SELECT * FROM " + table_name + " WHERE option_type IN (" + ph + ") AND time >= datetime(?, '-10 minutes') AND expire_date = ?" + fresh,
                 tuple(mirror_types) + (latest_time, exp),
             )
             rows = cur.fetchall()
@@ -251,9 +263,9 @@ def _parity_warn(cur, table_name, latest_time, best, signal_type, ua_price):
         best["parity_dev_pct"] = round(dev_pct, 2)
         sym = best.get("symbol", "-")
         if mine_is_call and dev_pct > PARITY_WARN_PCT:
-            logger.warning(f"\u26a0\ufe0f \u067e\u0631\u06cc\u062a\u06cc: \u06a9\u0627\u0644 {sym} \u0628\u0647 \u0627\u0646\u062f\u0627\u0632\u0647 {abs(dev_pct):.1f}% \u06af\u0631\u0627\u0646\u200c\u062a\u0631 \u0627\u0632 \u067e\u0648\u062a \u0647\u0645\u200c\u0633\u0631\u0631\u0633\u06cc\u062f \u0627\u0633\u062a")
+            logger.warning(f"⚠️ پریتی: کال {sym} به اندازه {abs(dev_pct):.1f}% گران‌تر از پوت هم‌سررسید است")
         elif (not mine_is_call) and dev_pct < -PARITY_WARN_PCT:
-            logger.warning(f"\u26a0\ufe0f \u067e\u0631\u06cc\u062a\u06cc: \u067e\u0648\u062a {sym} \u0628\u0647 \u0627\u0646\u062f\u0627\u0632\u0647 {abs(dev_pct):.1f}% \u06af\u0631\u0627\u0646\u200c\u062a\u0631 \u0627\u0632 \u06a9\u0627\u0644 \u0647\u0645\u200c\u0633\u0631\u0631\u0633\u06cc\u062f \u0627\u0633\u062a")
+            logger.warning(f"⚠️ پریتی: پوت {sym} به اندازه {abs(dev_pct):.1f}% گران‌تر از کال هم‌سررسید است")
     except Exception:
         return
 
@@ -262,9 +274,9 @@ def _parity_warn(cur, table_name, latest_time, best, signal_type, ua_price):
 # بخش تست راستی‌آزمایی با دیتابیس واقعی شما
 # =====================================================================
 if __name__ == "__main__":
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("🔍 راستی‌آزمایی انتخاب قراردادهای فعال امروز روی دیتابیس‌های واقعی")
-    print("="*70)
+    print("=" * 70)
 
     test_cases = [
         ("اهرم", "ahram_v2.db", "BUY_CALL", 57167.0),
@@ -281,4 +293,4 @@ if __name__ == "__main__":
         else:
             print("❌ قراردادی یافت نشد.")
 
-    print("\n" + "="*70 + "\n")
+    print("\n" + "=" * 70 + "\n")
