@@ -18,7 +18,10 @@
   [22] نوع: 311 = خرید (CALL)، 312 = فروش (PUT)
   [24] موقعیت‌های باز (open interest)
 
-قیمت «تازه» یعنی زمان [4] کمتر از MAX_PRICE_AGE_MIN دقیقه از الان فاصله داشته باشد.
+قیمت «تازه» یعنی هر دو شرط برقرار باشد:
+  ۱) زمان [4] کمتر از MAX_PRICE_AGE_MIN دقیقه از الان فاصله داشته باشد
+  ۲) قرارداد امروز واقعاً معامله داشته باشد (حجم [9] یا تعداد معاملات [8] بیشتر از صفر)
+قراردادی که امروز هیچ معامله‌ای نداشته (مثل طملت9041) هرگز «تازه» نمی‌شود، حتی اگر زمان قیمتش جدید به نظر برسد.
 قیمت غیرتازه ذخیره می‌شود ولی با price_fresh=0 علامت می‌خورد؛ پایش خروج فقط روی price_fresh=1 کار می‌کند.
 """
 import sys
@@ -40,6 +43,8 @@ HEADERS = {
 }
 
 MAX_PRICE_AGE_MIN = 30          # بیشتر از این = قیمت قدیمی
+CLOCK_TOLERANCE_MIN = 5.0
+MIN_OPTION_PRICE = 10.0       # قیمت زیر این مقدار (مثل ۱ ریال) واقعی نیست و هرگز تازه حساب نمی‌شود      # زمان معامله تا چند دقیقه بعد از شروع جمع‌آوری مجاز است (تأخیر ثبت/ساعت)
 UNDERLYING_INFO = {"price": None, "yesterday": None, "volume": None}
 
 NEW_COLUMNS = {"price_time": "TEXT", "price_age_min": "REAL", "price_fresh": "INTEGER",
@@ -136,6 +141,7 @@ def collect_options(now=None):
     option_root = getattr(config, "OPTION_ROOT", None)
     rows = []
     stale_count = 0
+    no_trade_count = 0
     for item in parts[2].strip().split(";"):
         f = item.split(",")
         if len(f) < 25:
@@ -158,7 +164,13 @@ def collect_options(now=None):
                 continue
 
             age = price_age_minutes(f[4], now)
-            fresh = 1 if (age is not None and 0 <= age <= MAX_PRICE_AGE_MIN) else 0
+            day_volume = float(f[9]) if f[9] else 0.0
+            day_trades = float(f[8]) if f[8] else 0.0
+            traded_today = (day_volume > 0 or day_trades > 0)
+            if not traded_today:
+                no_trade_count += 1
+            fresh = 1 if (traded_today and option_price >= MIN_OPTION_PRICE and age is not None
+                          and -CLOCK_TOLERANCE_MIN <= age <= MAX_PRICE_AGE_MIN) else 0
 
             strike_price, expire_date = _extract_from_name(name)
             if strike_price <= 0:
@@ -218,7 +230,7 @@ def collect_options(now=None):
         conn.close()
         print("=" * 60)
         print(f"OPTION DATA FETCHED FROM TSETMC | {config.UNDERLYING} PRICE: {UNDERLYING_INFO.get('price')}")
-        print(f"TOTAL OPTIONS: {len(rows)} | قیمت قدیمی (غیرتازه): {stale_count}")
+        print(f"TOTAL OPTIONS: {len(rows)} | قیمت قدیمی (غیرتازه): {stale_count} | بدون معامله‌ی امروز: {no_trade_count}")
         print("=" * 60)
     except Exception as e:
         print(f"[OPTION COLLECTOR] خطا ذخیره: {e}")

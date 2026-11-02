@@ -1,0 +1,142 @@
+{
+  "date": "2026-11-01",
+  "generated_at": "2026-11-01 14:54:20",
+  "symbols": {
+    "اهرم": {
+      "prices": {
+        "rows": 45,
+        "valid_price_rows": 45,
+        "open": 68800.0,
+        "close": 67059.0,
+        "high": 68800.0,
+        "low": 66764.0,
+        "volume_sum": 5167692935.0,
+        "first_time": "2026-11-01 08:40:05",
+        "last_time": "2026-11-01 12:26:48",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 3149,
+      "signals": {
+        "counts_by_type_rows": {
+          "WATCH": 43,
+          "BUY_PUT": 1
+        },
+        "counts_by_type_positions": {
+          "BUY_PUT": 1
+        },
+        "trades_started_today": [
+          {
+            "time": "2026-11-01 11:50:11",
+            "type": "BUY_PUT",
+            "score": 69.0,
+            "option": "طهرم8032",
+            "option_price": 4150.0,
+            "rows": 1,
+            "position_id": "اهرم-طهرم8032-BUY_PUT-20261101-115011"
+          }
+        ]
+      },
+      "closed_today": [],
+      "open_positions_now": [
+        {
+          "position_id": "اهرم-طهرم9028-BUY_PUT-20261031-101747",
+          "type": "BUY_PUT",
+          "option": "طهرم9028",
+          "entry_price": 5659.0,
+          "entry_time": "2026-10-31 10:17:47",
+          "rows_in_db": 3,
+          "status": "PENDING"
+        },
+        {
+          "position_id": "اهرم-طهرم8032-BUY_PUT-20261101-115011",
+          "type": "BUY_PUT",
+          "option": "طهرم8032",
+          "entry_price": 4150.0,
+          "entry_time": "2026-11-01 11:50:11",
+          "rows_in_db": 1,
+          "status": "PENDING"
+        }
+      ]
+    },
+    "وبملت": {
+      "prices": {
+        "rows": 45,
+        "valid_price_rows": 45,
+        "open": 1365.0,
+        "close": 1340.0,
+        "high": 1365.0,
+        "low": 1338.0,
+        "volume_sum": 130345362234.0,
+        "first_time": "2026-11-01 08:40:12",
+        "last_time": "2026-11-01 12:26:57",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 3458,
+      "signals": {
+        "counts_by_type_rows": {
+          "WATCH": 44
+        },
+        "counts_by_type_positions": {},
+        "trades_started_today": []
+      },
+      "closed_today": [],
+      "open_positions_now": [
+        {
+          "position_id": "وبملت-طملت9041-BUY_PUT-20261025-090756",
+          "type": "BUY_PUT",
+          "option": "طملت9041",
+          "entry_price": 70.0,
+          "entry_time": "2026-10-25 09:07:56",
+          "rows_in_db": 2,
+          "status": "T1_HIT"
+        },
+        {
+          "position_id": "وبملت-طملت8074-BUY_PUT-20261031-110833",
+          "type": "BUY_PUT",
+          "option": "طملت8074",
+          "entry_price": 51.0,
+          "entry_time": "2026-10-31 11:08:33",
+          "rows_in_db": 2,
+          "status": "T1_HIT"
+        }
+      ]
+    },
+    "شستا": {
+      "prices": {
+        "rows": 43,
+        "valid_price_rows": 43,
+        "open": 3290.0,
+        "close": 3200.0,
+        "high": 3290.0,
+        "low": 3200.0,
+        "volume_sum": 22670826176.0,
+        "first_time": "2026-11-01 08:40:19",
+        "last_time": "2026-11-01 12:27:03",
+        "duplicate_time_rows": 0,
+        "invalid_price_rows": 0
+      },
+      "options_rows_today": 2125,
+      "signals": {
+        "counts_by_type_rows": {
+          "WATCH": 44
+        },
+        "counts_by_type_positions": {},
+        "trades_started_today": []
+      },
+      "closed_today": [],
+      "open_positions_now": [
+        {
+          "position_id": "شستا-طستا9055-BUY_PUT-20261031-110312",
+          "type": "BUY_PUT",
+          "option": "طستا9055",
+          "entry_price": 171.0,
+          "entry_time": "2026-10-31 11:03:12",
+          "rows_in_db": 1,
+          "status": "T1_HIT"
+        }
+      ]
+    }
+  }
+}

@@ -23,6 +23,7 @@ MAX_DTE = 60            # حداکثر روز تا سررسید
 MIN_VOLUME = 0          # بدون محدودیت حجم در اسنپ‌شات اولیه
 
 PARITY_WARN_PCT = 1.0
+MIN_OPTION_PRICE = 10.0   # قیمت زیر این مقدار قابل اعتماد نیست
 
 
 def _fresh_clause(cur, table_name):
@@ -30,7 +31,7 @@ def _fresh_clause(cur, table_name):
     cur.execute(f"PRAGMA table_info({table_name})")
     cols = {r[1] for r in cur.fetchall()}
     if "price_fresh" in cols:
-        return " AND price_fresh = 1"
+        return f" AND price_fresh = 1 AND option_price >= {MIN_OPTION_PRICE}"
     logger.warning("⚠️ ستون price_fresh در جدول نیست؛ فیلتر تازگی اعمال نشد (option_collector را یک‌بار اجرا کنید)")
     return ""
 

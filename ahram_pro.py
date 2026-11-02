@@ -56,6 +56,29 @@ def _enable_file_logging():
     sys.stderr = _TeeToLogFile(sys.stderr, log_path)
     print(f"📝 لاگ این اجرا هم‌زمان ذخیره می‌شه در: {log_path}")
 
+# ==================== قفل یک‌نمونه‌ای ====================
+# اگر ربات دوباره (دستی، با Task Scheduler یا --test) اجرا شود در حالی که نمونه‌ی دیگری باز است،
+# هر دو در دیتابیس می‌نویسند و ردیف‌های تکراری ساخته می‌شود. این قفل جلوی آن را می‌گیرد.
+# قفل با بسته شدن برنامه (حتی با کرش یا قطع برق) خودکار آزاد می‌شود.
+SINGLE_INSTANCE_PORT = 47653
+_INSTANCE_LOCK_SOCKET = None
+
+
+def _acquire_single_instance_lock():
+    """True اگر این نمونه‌ی تنها ربات است؛ False اگر نمونه‌ی دیگری از قبل اجراست."""
+    global _INSTANCE_LOCK_SOCKET
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", SINGLE_INSTANCE_PORT))
+        s.listen(1)
+    except OSError:
+        s.close()
+        return False
+    _INSTANCE_LOCK_SOCKET = s
+    return True
+
+
 # ===== ماژول‌های قدیمی (v4.1) =====
 try:
     import ml_adjust
@@ -1414,7 +1437,7 @@ def log_signal_to_db(signal, symbol_name, db_name, features=None):
 
 
 def check_live_exits_for_symbol(name, db):
-    """پایش خروج زنده. هر خروج یا هدف فقط با دو قرائت پشت‌سرهم تأیید می‌شود.
+    """پایش خروج زنده. هر خروج یا هدف فقط با دو معامله‌ی متفاوت پشت‌سرهم تأیید می‌شود.
     فقط قیمت‌های تازه (price_fresh=1) استفاده می‌شوند. قرائت منفرد هرگز پوزیشن را نمی‌بندد."""
     alerts = []
     try:
@@ -1433,11 +1456,23 @@ def check_live_exits_for_symbol(name, db):
             entry_f = float(entry) if entry else 0.0
             if entry_f <= 0:
                 continue
+            # فقط قرائت‌هایی که مربوط به «معامله‌ی متفاوت» هستند: چند ردیف پشت‌سرهم با زمان آخرین معامله‌ی
+            # یکسان، همان یک معامله است و نباید دو بار تأیید حساب شود.
             cur.execute(
-                "SELECT option_price FROM options WHERE symbol=? AND option_price>0 AND price_fresh=1 ORDER BY id DESC LIMIT 2",
+                "SELECT option_price, price_time, substr(time,1,10) FROM options "
+                "WHERE symbol=? AND option_price>=10 AND price_fresh=1 ORDER BY id DESC LIMIT 60",
                 (sym,),
             )
-            readings = [float(r[0]) for r in cur.fetchall()]
+            readings = []
+            _seen_trades = set()
+            for _pr, _pt, _day in cur.fetchall():
+                _key = (_day, str(_pt))
+                if _key in _seen_trades:
+                    continue
+                _seen_trades.add(_key)
+                readings.append(float(_pr))
+                if len(readings) == 2:
+                    break
             if not readings:
                 state.log(f"  ⚠️ پایش خروج متوقف: قیمت تازه {sym} در options پیدا نشد (position {pos_id}) -- حد ضرر اجرا نمی‌شه", "WARN")
                 continue
@@ -1462,7 +1497,7 @@ def check_live_exits_for_symbol(name, db):
                     pass
 
             def confirmed(level, side):
-                # فقط اگر هر دو قرائت آخر در همان سمت سطح باشند. قرائت قبلی نباشد = تأیید نمی‌شود.
+                # فقط اگر هر دو معامله‌ی متفاوت آخر در همان سمت سطح باشند. معامله‌ی قبلی نباشد = تأیید نمی‌شود.
                 if prev_price is None:
                     return False
                 if side == "below":
@@ -1705,7 +1740,13 @@ def run():
 
 
 if __name__ == "__main__":
+    if not _acquire_single_instance_lock():
+        print("⛔ نمونه‌ی دیگری از ربات هم‌اکنون در حال اجراست؛ این نمونه بسته می‌شود تا ردیف تکراری ثبت نشود.")
+        print("   اگر مطمئنید ربات دیگری باز نیست، ممکن است برنامه‌ی دیگری پورت "
+              f"{SINGLE_INSTANCE_PORT} را گرفته باشد؛ عدد SINGLE_INSTANCE_PORT بالای فایل را عوض کنید.")
+        sys.exit(1)
     _enable_file_logging()
+    state.log(f"🔒 قفل یک‌نمونه‌ای گرفته شد (PID {os.getpid()})")
     if "--test" in sys.argv:
         run_cycle()
     else:
