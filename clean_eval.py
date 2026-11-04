@@ -21,6 +21,7 @@ from collections import Counter
 
 DBS = [("اهرم", "ahram_v2.db"), ("وبملت", "webmellt.db"), ("شستا", "shasta.db")]
 START_DATE = "2026-10-17"
+PARTIAL_EXIT_START = "2026-11-04 00:00:00"  # همان مقدار ahram_pro.py
 MIN_OPTION_PRICE = 10.0
 MIN_EXIT_TRADES = 5
 MIN_SAMPLE = 30
@@ -30,7 +31,7 @@ WITH b AS (
   SELECT position_id, MIN(id) AS first_id, MAX(id) AS last_id
   FROM signal_history WHERE position_id IS NOT NULL AND signal_type IN ('BUY_CALL','BUY_PUT')
   GROUP BY position_id)
-SELECT b.position_id, f.time, f.option_price, f.option_symbol, l.outcome, l.outcome_pct, l.outcome_time, l.signal_type
+SELECT b.position_id, f.time, f.option_price, f.option_symbol, l.outcome, l.outcome_pct, l.outcome_time, l.signal_type, l.outcome_time
 FROM b JOIN signal_history f ON f.id = b.first_id JOIN signal_history l ON l.id = b.last_id
 WHERE f.time >= ? ORDER BY f.time
 """
@@ -79,7 +80,7 @@ for name, db in DBS:
     rows = conn.execute(POS_SQL, (START_DATE,)).fetchall()
     reasons = Counter()
     closed_here, open_here = [], []
-    for pid, t0, entry, sym, outcome, pct, t_out, sig in rows:
+    for pid, t0, entry, sym, outcome, pct, t_out, sig, t_t1 in rows:
         if outcome == "NO_TRADE":
             reasons["بی‌معامله (NO_TRADE)"] += 1
             excluded.append((name, sym, t0, "بی‌معامله (NO_TRADE)"))
@@ -105,7 +106,13 @@ for name, db in DBS:
                 reasons["باز بدون قیمت تازه (ارزیابی نشد)"] += 1
                 excluded.append((name, sym, t0, "باز، بدون قیمت تازه"))
                 continue
-            open_here.append((sym, entry, (float(lp[1]) / entry - 1) * 100, outcome, lp[0]))
+            pnl_now = (float(lp[1]) / entry - 1) * 100
+            if outcome == "T1_HIT" and pct is not None and (t_t1 or "") >= PARTIAL_EXIT_START:
+                # نیمه‌ی اول در هدف اول بسته و سودش قفل شده؛ نیمه‌ی باقی‌مانده با قیمت فعلی
+                total_now = float(pct) + 0.5 * pnl_now
+            else:
+                total_now = pnl_now
+            open_here.append((sym, entry, total_now, outcome, lp[0]))
         else:
             reasons[f"وضعیت ناشناخته ({outcome})"] += 1
     conn.close()

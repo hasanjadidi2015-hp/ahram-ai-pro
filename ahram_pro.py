@@ -1436,6 +1436,11 @@ def log_signal_to_db(signal, symbol_name, db_name, features=None):
         state.log(f"  ❌ خطا دیتابیس: {e}", "ERROR")
 
 
+# از این زمان به بعد، رسیدن به هدف اول فقط نیمه‌ی پوزیشن را می‌بندد (سود نیمه قفل می‌شود).
+# T1 قبل از این زمان سود کل پوزیشن را ذخیره کرده بود، پس با آن جدا رفتار می‌شود.
+PARTIAL_EXIT_START = "2026-11-04 00:00:00"
+
+
 def check_live_exits_for_symbol(name, db):
     """پایش خروج زنده. هر خروج یا هدف فقط با دو معامله‌ی متفاوت پشت‌سرهم تأیید می‌شود.
     فقط قیمت‌های تازه (price_fresh=1) استفاده می‌شوند. قرائت منفرد هرگز پوزیشن را نمی‌بندد."""
@@ -1445,14 +1450,16 @@ def check_live_exits_for_symbol(name, db):
         cur = conn.cursor()
         # ورود، حد ضرر و اهداف از اولین ردیف هر پوزیشن (هدف مبنای معامله است)
         cur.execute(
-            "SELECT s.position_id, s.option_symbol, s.option_price, s.stop_loss, s.target1, s.target2, s.outcome "
+            "SELECT s.position_id, s.option_symbol, s.option_price, s.stop_loss, s.target1, s.target2, s.outcome, s.outcome_pct, s.outcome_time "
             "FROM signal_history s "
             "JOIN (SELECT position_id, MIN(id) AS mid FROM signal_history "
             "      WHERE outcome IN ('PENDING','T1_HIT') AND position_id IS NOT NULL GROUP BY position_id) m "
             "ON s.id = m.mid"
         )
         rows = cur.fetchall()
-        for pos_id, sym, entry, sl, t1, t2, outcome in rows:
+        for pos_id, sym, entry, sl, t1, t2, outcome, partial_locked, t_t1 in rows:
+            if outcome == "T1_HIT" and (t_t1 or "") < PARTIAL_EXIT_START:
+                partial_locked = None  # T1 قدیمی: سود کامل ذخیره شده، نیمه‌ی جداگانه نداریم
             entry_f = float(entry) if entry else 0.0
             if entry_f <= 0:
                 continue
@@ -1522,12 +1529,36 @@ def check_live_exits_for_symbol(name, db):
                 new_outcome = "T1_HIT"
 
             if new_outcome and new_outcome != outcome:
-                pct = round(pnl_pct, 1)
-                cur.execute(
-                    "UPDATE signal_history SET outcome=?, outcome_pct=?, outcome_time=? "
-                    "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
-                    (new_outcome, pct, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), pos_id),
-                )
+                now_txt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                if new_outcome == "T1_HIT":
+                    # نیمه‌ی اول (۵۰٪) در هدف اول بسته می‌شود و سودش قفل می‌شود.
+                    # نیمه‌ی باقی‌مانده با حد ضرر در ورود (سربه‌سر) ادامه می‌دهد.
+                    pct = round(0.5 * pnl_pct, 1)
+                    cur.execute(
+                        "UPDATE signal_history SET outcome=?, outcome_pct=?, outcome_time=?, stop_loss=? "
+                        "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
+                        (new_outcome, pct, now_txt, entry_f, pos_id),
+                    )
+                else:
+                    # بسته‌شدن نهایی: اگر قبلاً نیمه‌ی اول بسته شده، سود آن نیمه هم جمع می‌شود
+                    # نیمه‌ی باقی‌مانده فقط وقتی نصف است که نیمه‌ی اول واقعاً قفل شده باشد.
+                    # T1 قدیمی (قبل از PARTIAL_EXIT_START) کل پوزیشن را باز گذاشته بود، پس وزن کامل است.
+                    has_partial = (outcome == "T1_HIT" and partial_locked is not None)
+                    weight = 0.5 if has_partial else 1.0
+                    base = float(partial_locked) if has_partial else 0.0
+                    pct = round(base + weight * pnl_pct, 1)
+                    # برچسب نهایی بر اساس سود/زیان کل پوزیشن است، نه فقط نیمه‌ی باقی‌مانده
+                    if pct > 0.1:
+                        new_outcome = "WIN"
+                    elif abs(pct) <= 0.1:
+                        new_outcome = "BREAK_EVEN"
+                    else:
+                        new_outcome = "LOSS"
+                    cur.execute(
+                        "UPDATE signal_history SET outcome=?, outcome_pct=?, outcome_time=? "
+                        "WHERE position_id=? AND outcome IN ('PENDING','T1_HIT')",
+                        (new_outcome, pct, now_txt, pos_id),
+                    )
                 alerts.append((sym, new_outcome, pct, cur_price))
         conn.commit()
         conn.close()
